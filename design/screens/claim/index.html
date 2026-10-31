@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="en" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Make It Right — Claim</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #F4EFE6;
+  --ink: #23201C;
+  --graphite: #2B2926;
+  --sage: #6E8B5E;
+  --ochre: #C98A1B;
+  --terracotta: #B8502E;
+  --slot: #D9D5CF;
+  --font-serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+:root {
+  /* pipette from KB.png (1672 px source, scale 1440/1672) */
+  --rule-head: #67655F;
+  --rule-dark: #7D7A74;
+  --rule: #8F8C86;
+  --rule-pale: #ADAAA4;
+  --rule-strong: #827F7A;
+  --rule-light: #C4C0B9;
+  --rule-soft: #BDB9B2;
+  --divider: #D4CFC7;
+  --vsep: #8F8C86;
+  --text-gray: #75716D;
+  --caption: #8C8984;
+  --quote: #6F6B66;
+  --done-muted: #958D89;
+  --slot-dark: #CAC7C1;
+  --slot-tray: #DDD8CE;
+  --tray-card: #EEEAE1;
+  --tray-card-border: #D7D2C9;
+  --stamp-fill: #F4F0E8;
+  --stamp-shadow: rgba(35, 32, 28, 0.28);
+  --on-graphite: #F6F2EA;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-serif);
+  -webkit-font-smoothing: antialiased;
+}
+.page {
+  width: 1440px;
+  height: 810px;
+  position: relative;
+  overflow: hidden;
+}
+.mono { font-family: var(--font-mono); }
+.nw { white-space: nowrap; }
+.slot { display: block; background: var(--slot); }
+
+/* ---------- top bar ---------- */
+.topbar {
+  height: 55.5px;
+  border-bottom: 1px solid var(--rule-head);
+  display: flex;
+  align-items: flex-start;
+  padding: 0 35.3px 0 40px;
+}
+.wordmark {
+  flex: none;
+  width: 196.2px;
+  margin-top: 9.68px;
+  font-weight: 650;
+  font-size: 29.2px;
+  letter-spacing: -0.45px;
+  line-height: 36px;
+  height: 36px;
+  white-space: nowrap;
+  color: var(--ink);
+}
+.vsep {
+  flex: none;
+  width: 1px;
+  height: 29.3px;
+  margin-top: 13.3px;
+  background: var(--vsep);
+}
+.env {
+  flex: none;
+  margin: 18.3px 0 0 22.4px;
+  font-size: 17.1px;
+  line-height: 22px;
+  height: 22px;
+  white-space: nowrap;
+  color: var(--text-gray);
+}
+.nav {
+  margin-left: auto;
+  margin-top: 23.25px;
+  display: flex;
+  align-items: flex-start;
+}
+.nav .slot { height: 12.1px; background: var(--slot-dark); }
+.nav .s1 { width: 62.9px; }
+.nav .s2 { width: 43.1px; margin-left: 20.7px; }
+.nav .s3 { width: 56.8px; margin-left: 19.8px; }
+
+/* ---------- headline ---------- */
+.headline {
+  margin: 25.95px 0 0 0;
+  padding-left: 40.3px;
+  height: 56px;
+  font-weight: 690;
+  font-size: 49px;
+  line-height: 56px;
+  white-space: nowrap;
+  letter-spacing: -0.95px;
+}
+
+/* ---------- board ---------- */
+.board {
+  margin-top: 15.05px;
+  padding-left: 39.25px;
+  display: grid;
+  grid-template-columns: 1041.05px 311.7px;
+  column-gap: 13.4px;
+  grid-template-rows: auto auto;
+  grid-template-areas: "cards summary" "tray summary";
+  align-items: start;
+}
+.cards {
+  grid-area: cards;
+  display: grid;
+  grid-template-columns: 513.85px 512.6px;
+  column-gap: 14.6px;
+  grid-template-rows: 216.1px 220.3px;
+  padding-top: 0.8px;
+  row-gap: 14.4px;
+}
+
+/* claim card: Promised | Photo shows */
+.claim-card {
+  border: 1px solid var(--rule);
+  border-color: var(--rule-dark) var(--rule) var(--rule-pale) var(--rule-dark);
+  display: grid;
+  grid-template-columns: 244.35px 1fr;
+  min-width: 0;
+}
+.promised {
+  padding: 10.7px 16px 0 17px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.lbl {
+  height: 20px;
+  font-weight: 430;
+  font-size: 14.2px;
+  line-height: 20px;
+  letter-spacing: -0.13px;
+  white-space: nowrap;
+}
+.evidence .lbl { letter-spacing: -0.45px; }
+.quote {
+  margin: 8.3px 0 0;
+  height: 34px;
+  font-style: italic;
+  font-size: 14px;
+  line-height: 17px;
+  color: var(--quote);
+}
+.source {
+  margin-top: 1.7px;
+  height: 16px;
+  font-size: 13px;
+  line-height: 16px;
+  white-space: nowrap;
+  color: var(--quote);
+}
+.item-title {
+  margin: 25.5px 0 0;
+  height: 28px;
+  font-weight: 690;
+  font-size: 23.6px;
+  line-height: 28px;
+  letter-spacing: -0.6px;
+  white-space: nowrap;
+}
+.item-price {
+  margin-top: 2.4px;
+  height: 24px;
+  font-weight: 400;
+  font-size: 20.7px;
+  line-height: 24px;
+  white-space: nowrap;
+}
+.promised .slot { margin-top: 11px; width: 106.8px; height: 11.2px; }
+.row2 .promised { padding-top: 11.9px; }
+.row2 .item-title { margin-top: 28.1px; }
+.row2 .item-price { margin-top: 1.9px; }
+.row2 .promised .slot { margin-top: 11.4px; }
+
+.evidence {
+  border-left: 1px solid var(--divider);
+  padding: 10.7px 0 0 15.8px;
+  min-width: 0;
+}
+.row2 .evidence { padding-top: 11.9px; }
+.photo {
+  position: relative;
+  margin: 1.9px 0 0;
+}
+.row2 .photo { margin-top: 3.6px; }
+.photo img { display: block; }
+.ph-main { width: 235.98px; height: 165.36px; }
+.ph-ev { width: 235.12px; height: 165.36px; }
+.ph-flood { width: 235.12px; height: 166.22px; }
+.ph-recessed { width: 235.12px; height: 167.08px; }
+
+/* verdict stamps (HTML/CSS, not raster) */
+.stamp {
+  position: absolute;
+  transform: translate(-50%, -50%) rotate(var(--rot));
+  padding: 3.9px;
+  background: var(--stamp-fill);
+  border-radius: 4px;
+  box-shadow: 0 1px 3px var(--stamp-shadow);
+}
+.stamp-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2.2px solid currentColor;
+  border-radius: 3px;
+  font-weight: 640;
+  line-height: 1;
+  white-space: nowrap;
+}
+.stamp.not-done { color: var(--terracotta); }
+.stamp.partly { color: var(--ochre); }
+.stamp.not-done .stamp-box { width: 119.6px; height: 41.3px; font-size: 23.3px; letter-spacing: -0.1px; }
+.stamp.partly .stamp-box { width: 145.8px; height: 43.7px; font-size: 20.4px; }
+.st1 { left: 178.3px; top: 131.8px; --rot: -8.8deg; }
+.st2 { left: 177px; top: 131.8px; --rot: -8.85deg; }
+.st3 { left: 177px; top: 133.5px; --rot: -10.5deg; }
+.st4 { left: 163.2px; top: 131.3px; --rot: -10.1deg; }
+
+/* ---------- summary column ---------- */
+.summary {
+  grid-area: summary;
+  height: 632.8px;
+  border: 1px solid var(--rule-pale);
+  border-top-color: var(--rule-dark);
+  padding: 0 18.7px 0 19.7px;
+  display: flex;
+  flex-direction: column;
+}
+.payee {
+  margin: 18px 0 0;
+  height: 22px;
+  font-weight: 600;
+  font-size: 20px;
+  line-height: 22px;
+  white-space: nowrap;
+}
+.meta {
+  height: 17.5px;
+  font-size: 13.5px;
+  line-height: 17.5px;
+  white-space: nowrap;
+  color: var(--quote);
+}
+.meta.m1 { margin-top: 0.5px; }
+.rule { flex: none; height: 1px; background: var(--rule); }
+.rule.light { background: var(--rule-light); }
+.rule.r1 { margin-top: 23.7px; background: var(--rule-dark); }
+.sum-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  white-space: nowrap;
+}
+.sum-row .k { font-weight: 450; font-size: 20.6px; line-height: 24px; letter-spacing: -0.3px; }
+.sum-row .v { font-weight: 500; font-size: 19.6px; line-height: 24px; letter-spacing: -0.2px; }
+.row-paid { height: 63.2px; padding-top: 21.55px; }
+.row-proven { height: 60.1px; padding-top: 17.75px; }
+.row-proven .v { letter-spacing: 0.35px; }
+.row-claim { height: 67.5px; padding-top: 19.18px; }
+.row-claim .k { font-weight: 620; font-size: 23.2px; line-height: 28px; letter-spacing: -0.4px; }
+.row-claim .v { font-weight: 600; letter-spacing: -0.15px; }
+.file-btn {
+  display: block;
+  margin-top: 17.6px;
+  height: 64.6px;
+  background: var(--graphite);
+  color: var(--on-graphite);
+  text-align: center;
+  text-decoration: none;
+  font-weight: 540;
+  font-size: 24.4px;
+  line-height: 64.6px;
+  letter-spacing: -0.22px;
+  white-space: nowrap;
+}
+.file-note {
+  margin: 9.2px 0 0;
+  height: 35px;
+  font-size: 14.5px;
+  line-height: 17.5px;
+  text-align: center;
+  color: var(--caption);
+}
+.rule.r5 { margin-top: 8.7px; }
+.summary .slot { background: var(--slot-dark); height: 13.8px; }
+.summary .b1 { margin-top: 21.8px; width: 242.9px; }
+.summary .b2 { margin-top: 9.5px; width: 205.8px; }
+.summary .b3 { margin-top: 11.2px; width: 144.7px; }
+.rule.r6 { margin-top: 20.6px; background: var(--rule-pale); }
+
+/* ---------- removed-from-claim tray ---------- */
+.tray {
+  grid-area: tray;
+  margin-top: 16.7px;
+  height: 164.5px;
+  border: 1px solid var(--rule);
+  border-left-color: var(--rule-dark);
+  border-top: 2px solid var(--rule-strong);
+  border-bottom-color: var(--rule-soft);
+  padding: 0 11.4px 0 10.85px;
+}
+.tray-title {
+  margin: 11.33px 0 0 6.6px;
+  height: 28px;
+  font-weight: 600;
+  font-size: 23.2px;
+  letter-spacing: -0.3px;
+  line-height: 28px;
+  white-space: nowrap;
+  color: var(--ink);
+}
+.done-row {
+  margin-top: 9.07px;
+  display: grid;
+  grid-template-columns: 330.9px 333.5px 326.6px;
+  column-gap: 13.4px;
+}
+.done-card {
+  position: relative;
+  height: 106.1px;
+  border: 1px solid var(--tray-card-border);
+  border-radius: 3px;
+  background: var(--tray-card);
+  display: flex;
+  align-items: flex-start;
+  padding: 8.1px 0 0 9.05px;
+}
+.done-card img {
+  display: block;
+  flex: none;
+  height: 87.85px;
+  border-radius: 2px;
+  filter: saturate(0.7) opacity(0.85);
+}
+.ph-gfci { width: 113.68px; }
+.ph-fan { width: 118.85px; }
+.ph-recdone { width: 114.55px; }
+.done-text {
+  margin-left: 16.9px;
+  display: flex;
+  flex-direction: column;
+}
+.done-text .name {
+  margin-top: 10.05px;
+  height: 20px;
+  font-size: 16.3px;
+  line-height: 20px;
+  white-space: nowrap;
+  color: var(--done-muted);
+}
+.done-text .amt {
+  margin-top: 2.7px;
+  height: 20px;
+  font-size: 17.2px;
+  line-height: 20px;
+  white-space: nowrap;
+  color: var(--done-muted);
+}
+.done-text .slot { margin-top: 15.36px; width: 71.5px; height: 12.1px; background: var(--slot-tray); }
+.stamp.done {
+  left: 269.5px;
+  top: 66.7px;
+  --rot: -12.8deg;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--sage);
+}
+.stamp.done .stamp-box {
+  width: 85.4px;
+  height: 36.2px;
+  border-width: 2px;
+  font-size: 18.5px;
+  letter-spacing: -0.2px;
+  gap: 5px;
+}
+.stamp.done svg { width: 15px; height: 14px; display: block; }
+
+/* ---------- 390 ---------- */
+@media (max-width: 600px) {
+  .page { width: 100%; height: auto; overflow: visible; padding-bottom: 24px; }
+  .topbar { height: 49px; padding: 0 16px; align-items: center; }
+  .wordmark { width: auto; margin-top: 0; font-size: 24px; line-height: 30px; height: 30px; }
+  .vsep { margin: 0 0 0 14px; height: 24px; }
+  .env { margin: 0 0 0 14px; font-size: 15px; height: auto; }
+  .nav { display: none; }
+  .headline {
+    margin: 22px 16px 0;
+    padding-left: 0;
+    height: auto;
+    white-space: normal;
+    font-size: 28px;
+    line-height: 34px;
+  }
+  .board {
+    margin-top: 20px;
+    padding: 0 16px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "summary" "cards" "tray";
+    row-gap: 16px;
+  }
+  .summary { height: auto; padding: 0 18px 20px; }
+  .sum-row .k { font-size: 18px; }
+  .row-claim .k { font-size: 21px; }
+  .sum-row .v { font-size: 17.5px; }
+  .row-paid, .row-proven, .row-claim { height: 58px; padding-top: 17px; }
+  .cards { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; row-gap: 16px; }
+  .claim-card { grid-template-columns: minmax(0, 1fr); }
+  .promised, .row2 .promised { padding: 12px 16px 14px; }
+  .quote { height: auto; margin-top: 8px; }
+  .source { margin-top: 3px; height: auto; }
+  .item-title, .row2 .item-title { margin-top: 14px; font-size: 22px; }
+  .item-price, .row2 .item-price { margin-top: 2px; }
+  .evidence, .row2 .evidence { border-left: 0; border-top: 1px solid var(--divider); padding: 12px 16px 16px; }
+  .photo, .row2 .photo { margin-top: 6px; container-type: inline-size; }
+  .photo img { width: 100%; height: auto; }
+  /* stamps scale with the photo: same spot, same share of the frame as at 1440 */
+  .stamp { padding: 1.65cqw; border-radius: 1.7cqw; }
+  .stamp-box { border-width: 0.93cqw; border-radius: 1.27cqw; }
+  .stamp.not-done .stamp-box { width: 50.7cqw; height: 17.5cqw; font-size: 9.87cqw; }
+  .stamp.partly .stamp-box { width: 61.8cqw; height: 18.6cqw; font-size: 8.64cqw; }
+  .st1 { left: 75.55%; top: 79.7%; }
+  .st2 { left: 75.28%; top: 79.7%; }
+  .st3 { left: 75.28%; top: 80.3%; }
+  .st4 { left: 69.4%; top: 78.6%; }
+  .tray { height: auto; margin-top: 0; padding: 0 12px 12px; }
+  .tray-title { margin: 12px 0 0 4px; height: auto; white-space: normal; font-size: 20px; line-height: 26px; }
+  .done-row { grid-template-columns: minmax(0, 1fr); row-gap: 12px; margin-top: 10px; }
+  .done-card { min-width: 0; }
+  .stamp.done { left: auto; right: 14px; top: 67.7px; transform: translate(0, -50%) rotate(var(--rot)); }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="topbar">
+    <div class="wordmark">Make It Right</div>
+    <div class="vsep" aria-hidden="true"></div>
+    <div class="env">PayPal sandbox</div>
+    <nav class="nav" aria-label="Main">
+      <span class="slot s1" data-slot="nav-1"></span>
+      <span class="slot s2" data-slot="nav-2"></span>
+      <span class="slot s3" data-slot="nav-3"></span>
+    </nav>
+  </header>
+
+  <h1 class="headline">You paid <span data-field="paid_amount">$4,200</span>. Photos prove <span data-field="proven_done">$1,050</span> of work. Your claim: <span data-field="claim_amount">$3,150</span>.</h1>
+
+  <main class="board">
+
+    <section class="cards" aria-label="Claim: promised items not done">
+
+      <article class="claim-card" data-item="4">
+        <div class="promised">
+          <div class="lbl">Promised</div>
+          <p class="quote" data-field="promise_quote">“Upgrade the main panel to 200A, new breakers and permit.”</p>
+          <div class="source"><span data-field="promise_source">Estimate p.3</span> · <span data-field="promise_date">Sep 10</span></div>
+          <h2 class="item-title" data-field="item_title">Main panel upgrade</h2>
+          <div class="item-price mono" data-field="item_price">$1,800</div>
+          <span class="slot" data-slot="verdict-note"></span>
+        </div>
+        <div class="evidence">
+          <div class="lbl">Photo shows</div>
+          <figure class="photo">
+            <img class="ph-main" data-field="photo" src="assets/photo-main-panel.png" alt="Old main panel, still in place">
+            <div class="stamp not-done st1" data-field="verdict"><div class="stamp-box">Not done</div></div>
+          </figure>
+        </div>
+      </article>
+
+      <article class="claim-card" data-item="5">
+        <div class="promised">
+          <div class="lbl">Promised</div>
+          <p class="quote" data-field="promise_quote">“I'll run a 50A circuit for the EV charger in the garage.”</p>
+          <div class="source"><span data-field="promise_source">Text</span> · <span data-field="promise_date">Sep 9</span></div>
+          <h2 class="item-title" data-field="item_title">EV charger circuit</h2>
+          <div class="item-price mono" data-field="item_price">$650</div>
+          <span class="slot" data-slot="verdict-note"></span>
+        </div>
+        <div class="evidence">
+          <div class="lbl">Photo shows</div>
+          <figure class="photo">
+            <img class="ph-ev" data-field="photo" src="assets/photo-ev-circuit.png" alt="Empty box and loose cable on the garage wall">
+            <div class="stamp not-done st2" data-field="verdict"><div class="stamp-box">Not done</div></div>
+          </figure>
+        </div>
+      </article>
+
+      <article class="claim-card row2" data-item="6">
+        <div class="promised">
+          <div class="lbl">Promised</div>
+          <p class="quote" data-field="promise_quote">“Two LED flood lights over the backyard, on a switch.”</p>
+          <div class="source"><span data-field="promise_source">Estimate p.2</span> · <span data-field="promise_date">Sep 10</span></div>
+          <h2 class="item-title" data-field="item_title">Flood lights</h2>
+          <div class="item-price mono" data-field="item_price">$460</div>
+          <span class="slot" data-slot="verdict-note"></span>
+        </div>
+        <div class="evidence">
+          <div class="lbl">Photo shows</div>
+          <figure class="photo">
+            <img class="ph-flood" data-field="photo" src="assets/photo-flood-lights.png" alt="Bare wire hanging under the eave, no lights">
+            <div class="stamp not-done st3" data-field="verdict"><div class="stamp-box">Not done</div></div>
+          </figure>
+        </div>
+      </article>
+
+      <article class="claim-card row2" data-item="3">
+        <div class="promised">
+          <div class="lbl">Promised</div>
+          <p class="quote" data-field="promise_quote">“Six recessed lights in the kitchen ceiling.”</p>
+          <div class="source"><span data-field="promise_source">Estimate p.2</span> · <span data-field="promise_date">Sep 10</span></div>
+          <h2 class="item-title" data-field="item_title">Recessed lights</h2>
+          <div class="item-price mono"><span data-field="item_claim">$240</span> of <span data-field="item_price">$720</span></div>
+          <span class="slot" data-slot="verdict-note"></span>
+        </div>
+        <div class="evidence">
+          <div class="lbl">Photo shows</div>
+          <figure class="photo">
+            <img class="ph-recessed" data-field="photo" src="assets/photo-recessed-lights.png" alt="Kitchen ceiling: two lights on, open holes">
+            <div class="stamp partly st4" data-field="verdict"><div class="stamp-box"><span>Partly · <span data-field="verdict_fraction">4 of 6</span></span></div></div>
+          </figure>
+        </div>
+      </article>
+
+    </section>
+
+    <aside class="summary" aria-label="Claim summary">
+      <div class="payee" data-field="payee">Ridgeway Electric</div>
+      <div class="meta m1">Paid <span data-field="paid_at">Sep 12</span> · <span data-field="method">PayPal Goods &amp; Services</span></div>
+      <div class="meta">Reason: <span data-field="reason">Service not received</span></div>
+      <div class="rule r1"></div>
+      <div class="sum-row row-paid"><span class="k">Paid</span><span class="v mono" data-field="paid_amount">$4,200.00</span></div>
+      <div class="rule light"></div>
+      <div class="sum-row row-proven"><span class="k">Proven</span><span class="v mono" data-field="proven_done">-$1,050.00</span></div>
+      <div class="rule"></div>
+      <div class="sum-row row-claim"><span class="k">Claim</span><span class="v mono" data-field="claim_amount">$3,150.00</span></div>
+      <div class="rule light"></div>
+      <a class="file-btn" data-field="filing_url" href="#">File with PayPal</a>
+      <p class="file-note">You file it in PayPal.<br>Proof for each item is attached.</p>
+      <div class="rule r5"></div>
+      <span class="slot b1" data-slot="transaction-id"></span>
+      <span class="slot b2" data-slot="eligibility"></span>
+      <span class="slot b3" data-slot="dispute-status"></span>
+      <div class="rule r6"></div>
+    </aside>
+
+    <section class="tray" aria-label="Removed from claim">
+      <h2 class="tray-title">Removed from claim · photos prove done · <span data-field="proven_done">$1,050</span></h2>
+      <div class="done-row">
+        <article class="done-card" data-item="1">
+          <img class="ph-gfci" data-field="photo" src="assets/photo-gfci-outlets.png" alt="New GFCI outlet installed">
+          <div class="done-text">
+            <div class="name" data-field="item_title">GFCI outlets</div>
+            <div class="amt mono" data-field="item_price">$260</div>
+            <span class="slot" data-slot="verdict-note"></span>
+          </div>
+          <div class="stamp done" data-field="verdict"><div class="stamp-box"><svg viewBox="0 0 16 14" aria-hidden="true"><path d="M1.8 7.6 6 11.8 14.2 2.2" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Done</div></div>
+        </article>
+        <article class="done-card" data-item="2">
+          <img class="ph-fan" data-field="photo" src="assets/photo-ceiling-fan.png" alt="Ceiling fan installed, light on">
+          <div class="done-text">
+            <div class="name" data-field="item_title">Ceiling fan</div>
+            <div class="amt mono" data-field="item_price">$310</div>
+            <span class="slot" data-slot="verdict-note"></span>
+          </div>
+          <div class="stamp done" data-field="verdict"><div class="stamp-box"><svg viewBox="0 0 16 14" aria-hidden="true"><path d="M1.8 7.6 6 11.8 14.2 2.2" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Done</div></div>
+        </article>
+        <article class="done-card" data-item="3">
+          <img class="ph-recdone" data-field="photo" src="assets/photo-recessed-done.png" alt="Recessed light installed">
+          <div class="done-text">
+            <div class="name" data-field="item_title">4 recessed lights</div>
+            <div class="amt mono" data-field="item_price">$480</div>
+            <span class="slot" data-slot="verdict-note"></span>
+          </div>
+          <div class="stamp done" data-field="verdict"><div class="stamp-box"><svg viewBox="0 0 16 14" aria-hidden="true"><path d="M1.8 7.6 6 11.8 14.2 2.2" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Done</div></div>
+        </article>
+      </div>
+    </section>
+
+  </main>
+</div>
+</body>
+</html>

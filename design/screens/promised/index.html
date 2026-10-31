@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1440">
+<title>Make It Right — What did Ridgeway Electric promise? (N1)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700;8..60,800&amp;family=IBM+Plex+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #F4EFE6;
+  --ink: #23201C;
+  --graphite: #2B2926;
+  --sage: #6E8B5E;
+  --ochre: #C98A1B;
+  --terracotta: #B8502E;
+  --slot: #D9D5CF;
+  --font-serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+/* N1 extras, sampled from N1.png (PIL) */
+:root {
+  --slot-n1: #BEBBB8;        /* grey placeholder bars */
+  --frame-n1: #3C3833;       /* panel frames, row rules, source tags */
+  --rule-head-n1: #4E4943;   /* 2px rule under the header */
+  --rule-soft-n1: #9A958E;   /* footer rule (2px) */
+  --muted-n1: #77736E;       /* "PayPal sandbox" label (unified header), neutral info icon */
+  --on-dark-n1: #FAF9F7;     /* button text, check marks */
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: var(--paper); }
+body {
+  width: 1440px;
+  color: var(--ink);
+  font-family: var(--font-serif);
+  -webkit-font-smoothing: antialiased;
+}
+.page {
+  width: 1440px;
+  height: 810px;
+  display: grid;
+  grid-template-rows: 72.2px 2px 142px 526px 21.1px 2px 44.7px;
+  overflow: hidden;
+}
+.nowrap, .num, .mono { white-space: nowrap; }
+.mono { font-family: var(--font-mono); }
+.slot { display: block; background: var(--slot-n1); flex: none; }
+
+/* ---------- header (unified for all product screens) ---------- */
+.top { display: flex; align-items: flex-start; }
+.brand {
+  width: 296.4px; margin: 11.3px 0 0 34.3px;
+  font-size: 45.9px; line-height: 45.9px; font-weight: 700;
+  white-space: nowrap; letter-spacing: 0;
+}
+.brand-divider { width: 1px; height: 39.7px; margin-top: 14.6px; background: var(--ink); flex: none; }
+.env {
+  margin: 22.6px 0 0 28.3px;
+  font-size: 21px; line-height: 21px; font-weight: 400;
+  color: var(--muted-n1); white-space: nowrap;
+}
+.nav { margin: 27.6px 30.2px 0 auto; display: flex; }
+.nav .slot { height: 17.2px; }
+.nav .slot:nth-child(1) { width: 81.8px; }
+.nav .slot:nth-child(2) { width: 81.8px; margin-left: 25.9px; }
+.nav .slot:nth-child(3) { width: 77.5px; margin-left: 25.8px; }
+.top-rule { background: var(--rule-head-n1); }
+
+/* ---------- title ---------- */
+.title-band { padding: 35.3px 0 0 32.6px; }
+h1 {
+  font-size: 66.1px; line-height: 66.1px; font-weight: 800;
+  white-space: nowrap; letter-spacing: 0;
+}
+
+/* ---------- three panels ---------- */
+.panels {
+  display: grid;
+  grid-template-columns: 386.7px 607.2px 383.3px;
+  column-gap: 16.1px;
+  padding-left: 14.6px;
+}
+.panel { border: 1px solid var(--frame-n1); height: 526px; display: flex; flex-direction: column; }
+.panel-head { display: flex; align-items: flex-start; flex: none; border-bottom: 1px solid var(--ink); }
+.panel-head h2 { font-weight: 800; white-space: nowrap; margin-left: 3.3px; }
+
+/* sources */
+.p-sources .panel-head { height: 69.2px; margin: 0 14.5px; }
+.p-sources h2 { font-size: 34.4px; line-height: 34.4px; margin-top: 17.2px; }
+.p-sources .panel-head .slot { width: 83.5px; height: 17.2px; margin: 27.4px 4.3px 0 auto; }
+.source-list { display: flex; flex-direction: column; margin: 29.3px 0 0 13.7px; width: 358.3px; }
+.source {
+  border: 1px solid var(--ink); display: flex; align-items: flex-start; flex: none;
+}
+.source + .source { margin-top: 13.8px; }
+.source:nth-child(3) { margin-top: 13px; }
+.source-photo { flex: none; width: 129.2px; margin-left: 8.5px; display: block; }
+.source-body { margin-left: 13.7px; display: flex; flex-direction: column; }
+.source-title { font-size: 22.35px; line-height: 22.35px; font-weight: 700; white-space: nowrap; }
+.source-title .dot { margin: 0 0.1em; }
+.source-body .slot { height: 12.9px; margin-left: 2.7px; }
+.src-1 { height: 130.9px; }
+.src-1 .source-photo { height: 112px; margin-top: 9.2px; }
+.src-1 .source-title { margin-top: 18.4px; letter-spacing: -0.65px; }
+.src-1 .s-a { margin-top: 19.15px; width: 175.7px; }
+.src-1 .s-b { margin-top: 9px; width: 125.7px; }
+.src-2 { height: 130px; }
+.src-2 .source-photo { height: 111.1px; margin-top: 7.5px; }
+.src-2 .source-title { margin-top: 17.5px; }
+.src-2 .s-a { margin-top: 20.15px; width: 175.7px; }
+.src-2 .s-b { margin-top: 9.5px; width: 139.5px; }
+.src-3 { height: 125.7px; }
+.src-3 .source-photo { height: 107.7px; margin-top: 7.6px; }
+.src-3 .source-title { margin-top: 14.9px; }
+.src-3 .s-a { margin-top: 20.15px; width: 175.7px; }
+.src-3 .s-b { margin-top: 11.2px; width: 107.7px; }
+
+/* promised items */
+.p-items .panel-head { height: 70.4px; margin: 0 14.2px 0 13.9px; }
+.p-items h2 { font-size: 33.9px; line-height: 33.9px; margin-top: 17.6px; }
+.p-items .panel-head .slot { width: 112px; height: 17.2px; margin: 28.3px 5.1px 0 auto; }
+.items { margin: 5.7px 14.2px 0 13.9px; display: flex; flex-direction: column; }
+.item {
+  height: 57.27px; flex: none;
+  display: grid; grid-template-columns: 260px 123.3px auto; column-gap: 0;
+  padding-left: 7.2px; align-items: start;
+  border-bottom: 1px solid var(--frame-n1);
+}
+.item:last-child { border-bottom: 0; }
+.item-title { font-size: 26.1px; line-height: 26.1px; font-weight: 600; margin-top: 13.85px; white-space: nowrap; }
+.item-price { font-family: var(--font-mono); font-weight: 500; font-size: 27px; line-height: 27px; margin-top: 12.6px; text-align: right; white-space: nowrap; }
+.item-source {
+  justify-self: start; margin: 13.8px 0 0 44.5px; height: 28.4px;
+  display: flex; align-items: center; padding: 0 12.4px;
+  border: 1px solid var(--frame-n1);
+  font-family: var(--font-mono); font-weight: 600; font-size: 14.7px; line-height: 14.7px; white-space: nowrap;
+}
+.total {
+  margin: 8.9px 14.2px 0 13.9px; border-top: 1px solid var(--ink);
+  display: flex; align-items: flex-start; height: 80px;
+}
+.total-label { font-size: 35.3px; line-height: 35.3px; font-weight: 700; margin: 19.2px 0 0 5.1px; white-space: nowrap; width: 290.9px; }
+.total-amount { font-family: var(--font-mono); font-weight: 500; font-size: 33.7px; line-height: 33.7px; margin-top: 20px; white-space: nowrap; }
+
+/* can PayPal help */
+.p-help { margin-left: 0.6px; }
+.p-help .panel-head { height: 72.3px; margin: 0 14px 0 15.3px; }
+.p-help h2 { font-size: 36px; line-height: 36px; margin-top: 14.8px; }
+.checks { margin: 24.5px 0 0 18.7px; display: flex; flex-direction: column; }
+.check { display: flex; align-items: flex-start; flex: none; }
+.check svg { flex: none; display: block; }
+.ic-box { fill: var(--sage); }
+.ic-mark { fill: none; stroke: var(--on-dark-n1); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.ic-ring { fill: none; stroke: var(--muted-n1); stroke-width: 1.6; }
+.ic-dot { fill: var(--muted-n1); }
+.check-text { margin-left: 16.3px; font-size: 24.55px; line-height: 27.6px; font-weight: 500; width: 296px; }
+.check-1 { height: 55.2px; }
+.check-1 svg { margin-top: 8.1px; }
+.check-2 { height: 27.6px; margin-top: 24.9px; }
+.check-2 svg { margin-top: 1.2px; }
+.check-2 .check-text { margin-left: 17.8px; }
+.check-3 { height: 27.6px; margin-top: 30.2px; }
+.check-3 svg { margin-top: 2px; }
+.check-3 .check-text { font-size: 22.5px; letter-spacing: -0.55px; width: auto; }
+.btn {
+  display: block; flex: none;
+  margin: 43.9px 0 0 20.5px; width: 345.4px; height: 63.8px;
+  background: var(--graphite); color: var(--on-dark-n1);
+  font-size: 32.3px; line-height: 32.3px; font-weight: 500;
+  text-align: center; padding: 12.5px 0 0 14.8px;
+  text-decoration: none; white-space: nowrap;
+}
+.help-slots { margin: 31px 0 0 24.8px; display: flex; flex-direction: column; }
+.help-slots .slot:nth-child(1) { width: 329.9px; height: 12.9px; }
+.help-slots .slot:nth-child(2) { width: 298.9px; height: 12.9px; margin-top: 12.1px; }
+.help-slots .slot:nth-child(3) { width: 220.5px; height: 12.1px; margin-top: 13.8px; }
+
+/* ---------- footer ---------- */
+.foot-rule { margin: 0 22.4px 0 21.5px; background: var(--rule-soft-n1); }
+.foot { display: flex; align-items: flex-start; padding-top: 14.1px; }
+.foot .slot { height: 14.6px; }
+.foot .f1 { width: 70.6px; margin-left: 37px; }
+.foot .f2 { width: 70.6px; margin-left: 27.6px; }
+.foot .f3 { width: 74.1px; margin-left: 28.5px; }
+.foot .f4 { width: 150.7px; margin-left: auto; margin-right: 36.2px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="top">
+    <div class="brand">Make It Right</div>
+    <span class="brand-divider" aria-hidden="true"></span>
+    <div class="env">PayPal sandbox</div>
+    <nav class="nav" aria-label="Main">
+      <span class="slot" data-slot="nav-1"></span>
+      <span class="slot" data-slot="nav-2"></span>
+      <span class="slot" data-slot="nav-3"></span>
+    </nav>
+  </header>
+  <div class="top-rule" aria-hidden="true"></div>
+
+  <div class="title-band">
+    <h1>What did <span data-field="payee">Ridgeway Electric</span> promise?</h1>
+  </div>
+
+  <main class="panels">
+
+    <section class="panel p-sources" aria-label="Sources">
+      <div class="panel-head">
+        <h2>Sources</h2>
+        <span class="slot" data-slot="sources-meta"></span>
+      </div>
+      <div class="source-list">
+        <article class="source src-1" data-source="estimate">
+          <img class="source-photo" src="assets/source-estimate.png" alt="Estimate document" data-field="source_photo">
+          <div class="source-body">
+            <div class="source-title"><span data-field="source_name">Estimate.pdf</span> <span class="dot">·</span> <span data-field="source_date">Sep 10</span></div>
+            <span class="slot s-a" data-slot="estimate-summary-1"></span>
+            <span class="slot s-b" data-slot="estimate-summary-2"></span>
+          </div>
+        </article>
+        <article class="source src-2" data-source="text">
+          <img class="source-photo" src="assets/source-texts.png" alt="Text messages on a phone" data-field="source_photo">
+          <div class="source-body">
+            <div class="source-title"><span data-field="source_name">Text messages</span> · <span class="num" data-field="source_count">14</span></div>
+            <span class="slot s-a" data-slot="texts-summary-1"></span>
+            <span class="slot s-b" data-slot="texts-summary-2"></span>
+          </div>
+        </article>
+        <article class="source src-3" data-source="photo">
+          <img class="source-photo" src="assets/source-jobsite-photos.png" alt="Job-site photo of flood lights" data-field="source_photo">
+          <div class="source-body">
+            <div class="source-title"><span data-field="source_name">Job-site photos</span> · <span class="num" data-field="source_count">9</span></div>
+            <span class="slot s-a" data-slot="photos-summary-1"></span>
+            <span class="slot s-b" data-slot="photos-summary-2"></span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel p-items" aria-label="Promised items found">
+      <div class="panel-head">
+        <h2>Promised items found</h2>
+        <span class="slot" data-slot="items-meta"></span>
+      </div>
+      <div class="items" role="list">
+        <div class="item" role="listitem" data-item="1">
+          <span class="item-title" data-field="title">GFCI outlets</span>
+          <span class="item-price" data-field="price">$260</span>
+          <span class="item-source" data-field="source">estimate p.1</span>
+        </div>
+        <div class="item" role="listitem" data-item="2">
+          <span class="item-title" data-field="title">Ceiling fan</span>
+          <span class="item-price" data-field="price">$310</span>
+          <span class="item-source" data-field="source">text Sep 9</span>
+        </div>
+        <div class="item" role="listitem" data-item="3">
+          <span class="item-title" data-field="title">Recessed lights (6)</span>
+          <span class="item-price" data-field="price">$720</span>
+          <span class="item-source" data-field="source">estimate p.2</span>
+        </div>
+        <div class="item" role="listitem" data-item="4">
+          <span class="item-title" data-field="title">Main panel upgrade</span>
+          <span class="item-price" data-field="price">$1,800</span>
+          <span class="item-source" data-field="source">estimate p.3</span>
+        </div>
+        <div class="item" role="listitem" data-item="5">
+          <span class="item-title" data-field="title">EV charger circuit</span>
+          <span class="item-price" data-field="price">$650</span>
+          <span class="item-source" data-field="source">text Sep 9</span>
+        </div>
+        <div class="item" role="listitem" data-item="6">
+          <span class="item-title" data-field="title">Flood lights</span>
+          <span class="item-price" data-field="price">$460</span>
+          <span class="item-source" data-field="source">estimate p.2</span>
+        </div>
+      </div>
+      <div class="total">
+        <span class="total-label">Total</span>
+        <span class="total-amount" data-field="paid_total">$4,200.00</span>
+      </div>
+    </section>
+
+    <section class="panel p-help" aria-label="Can PayPal help?">
+      <div class="panel-head">
+        <h2>Can PayPal help?</h2>
+      </div>
+      <div class="checks">
+        <div class="check check-1">
+          <svg width="32.7" height="28.4" viewBox="0 0 32.7 28.4" aria-hidden="true" data-field="method_check">
+            <rect class="ic-box" width="32.7" height="28.4" rx="2.4"/>
+            <polyline class="ic-mark" points="8,14.9 13.3,20.6 24.6,7.4"/>
+          </svg>
+          <div class="check-text">Paid with <span data-field="method">PayPal Goods &amp; Services</span></div>
+        </div>
+        <div class="check check-2">
+          <svg width="32.7" height="28.4" viewBox="0 0 32.7 28.4" aria-hidden="true" data-field="window_check">
+            <rect class="ic-box" width="32.7" height="28.4" rx="2.4"/>
+            <polyline class="ic-mark" points="8,14.9 13.3,20.6 24.6,7.4"/>
+          </svg>
+          <div class="check-text nowrap"><span data-field="paid_at">Sep 12</span> · day <span class="num" data-field="day_n">49</span> of 180</div>
+        </div>
+        <div class="check check-3">
+          <svg width="32.7" height="28.4" viewBox="0 0 32.7 28.4" aria-hidden="true" data-field="eligibility_icon">
+            <circle class="ic-ring" cx="16.35" cy="14.2" r="13.3"/>
+            <circle class="ic-dot" cx="16.35" cy="8.6" r="1.6"/>
+            <rect class="ic-dot" x="15.15" y="11.7" width="2.4" height="9.6" rx="1.1"/>
+          </svg>
+          <div class="check-text nowrap" data-field="eligibility_note">may be eligible · PayPal decides</div>
+        </div>
+      </div>
+      <a class="btn" href="#" data-field="next_url">Check the photos</a>
+      <div class="help-slots">
+        <span class="slot" data-slot="help-note-1"></span>
+        <span class="slot" data-slot="help-note-2"></span>
+        <span class="slot" data-slot="help-note-3"></span>
+      </div>
+    </section>
+
+  </main>
+
+  <div aria-hidden="true"></div>
+  <div class="foot-rule" aria-hidden="true"></div>
+  <footer class="foot">
+    <span class="slot f1" data-slot="footer-1"></span>
+    <span class="slot f2" data-slot="footer-2"></span>
+    <span class="slot f3" data-slot="footer-3"></span>
+    <span class="slot f4" data-slot="footer-status"></span>
+  </footer>
+
+</div>
+</body>
+</html>

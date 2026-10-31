@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=430">
+<title>Make It Right — Money back, phone (N3)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #F4EFE6;
+  --ink: #23201C;
+  --graphite: #2B2926;
+  --sage: #6E8B5E;
+  --ochre: #C98A1B;
+  --terracotta: #B8502E;
+  --slot: #D9D5CF;
+  --font-serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+/* N3: colors picked from N3-screen.png with PIL */
+:root {
+  --n3-page: #F4EBDE;        /* screen paper (244,235,222) */
+  --n3-card: #E3D8C7;        /* "Kept by" card (227,216,199) */
+  --n3-slot: #C4BDB5;        /* gray slot bars on paper (196,189,181) */
+  --n3-slot-card: #BEB7AE;   /* gray slot bars on the card (190,183,174) */
+  --n3-check: #677D45;       /* step circles and connector (103,125,69) */
+  --n3-check-mark: #FFFDF5;  /* tick inside the circle */
+  --n3-rule: #D3C5B3;        /* header hairline + divider (former pill tone 211,197,179) */
+  --n3-muted: #6F6962;       /* "PayPal sandbox" gray text */
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 430px; }
+body {
+  height: 718px;
+  background: var(--n3-page);
+  color: var(--ink);
+  font-family: var(--font-serif);
+  overflow: hidden;
+}
+.screen {
+  position: relative;
+  width: 430px;
+  height: 718px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- product header, mobile ---------- */
+.app-head {
+  flex: none;
+  height: 62px;
+  display: flex;
+  align-items: flex-start;
+  padding-left: 22.19px;
+  border-bottom: 1px solid var(--n3-rule);
+}
+.wordmark {
+  margin-top: 16.52px;
+  font-weight: 645;
+  font-size: 35.68px;
+  line-height: 40px;
+  white-space: nowrap;
+}
+.head-divider {
+  flex: none;
+  width: 1px;
+  height: 23px;
+  margin: 26px 0 0 21.75px;
+  background: var(--n3-rule);
+}
+.env-label {
+  margin: 27.84px 0 0 22.17px;
+  font-weight: 400;
+  font-size: 15.86px;
+  line-height: 20px;
+  color: var(--n3-muted);
+  white-space: nowrap;
+}
+
+/* ---------- gray slot bars ---------- */
+.slot {
+  display: block;
+  height: 10.45px;
+  border-radius: 5.23px;
+  background: var(--n3-slot);
+}
+.head-slots { flex: none; height: 32.84px; padding: 4.71px 0 0 22.5px; }
+.head-slots .slot + .slot { margin-top: 7.23px; }
+
+/* ---------- stamp ---------- */
+.stamp-zone {
+  flex: none;
+  height: 104.48px;
+  display: grid;
+  place-items: center;
+}
+.stamp {
+  position: relative;
+  width: 321.5px;
+  height: 74.75px;
+  border: 3px solid var(--sage);
+  border-radius: 10.45px;
+  color: var(--sage);
+  display: grid;
+  place-items: center;
+  transform: translateX(0.8px) rotate(-7deg);
+}
+.stamp::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border: 2px solid var(--sage);
+  border-radius: 7px;
+}
+.stamp-word {
+  position: relative;
+  top: -4.9px;
+  left: 2.01px;
+  font-weight: 700;
+  font-size: 55.38px;
+  line-height: 60px;
+  white-space: nowrap;
+}
+
+/* ---------- refund amount ---------- */
+.refund { flex: none; text-align: center; }
+.refund-amount {
+  display: block;
+  margin-top: 7.6px;
+  padding-left: 1.52px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 60.5px;
+  letter-spacing: -1.4px;
+  line-height: 60px;
+  white-space: nowrap;
+}
+.refund-note {
+  margin-top: 5.18px;
+  padding-left: 3.98px;
+  font-weight: 530;
+  font-size: 14.35px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.refund-slots { flex: none; padding: 8.9px 0 0 35.36px; }
+.refund-slots .slot + .slot { margin-top: 8.04px; }
+
+/* ---------- dispute steps ---------- */
+.steps {
+  flex: none;
+  position: relative;
+  list-style: none;
+  margin-top: 28.13px;
+}
+.steps::before {
+  content: "";
+  position: absolute;
+  left: 41px;
+  top: 11.25px;
+  width: 3.21px;
+  height: 159.15px;
+  background: var(--n3-check);
+}
+.step {
+  position: relative;
+  height: 53.05px;
+  padding-left: 73.2px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.step-mark {
+  position: absolute;
+  left: 31.35px;
+  top: 0;
+  width: 22.5px;
+  height: 22.5px;
+  display: block;
+}
+.step-mark circle { fill: var(--n3-check); }
+.step-mark path { fill: none; stroke: var(--n3-check-mark); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.step-text {
+  display: block;
+  margin-top: -0.54px;
+  font-weight: 600;
+  font-size: 19.9px;
+  line-height: 18px;
+  height: 18px;
+  white-space: nowrap;
+}
+.step .slot { margin: 8.98px 0 0 -0.06px; }
+
+/* ---------- kept by contractor card ---------- */
+.kept {
+  flex: none;
+  margin: 10.03px 0 0 17.28px;
+  width: 394.64px;
+  height: 121.77px;
+  border-radius: 12.06px;
+  background: var(--n3-card);
+  padding: 10.51px 0 0 17.97px;
+}
+.kept-title {
+  font-weight: 600;
+  font-size: 26.96px;
+  line-height: 30px;
+  height: 30px;
+  white-space: nowrap;
+}
+.kept-sub {
+  margin: 2.33px 0 0 0.26px;
+  font-weight: 400;
+  font-size: 21.25px;
+  line-height: 24px;
+  height: 24px;
+  white-space: nowrap;
+}
+.kept .slot { background: var(--n3-slot-card); margin-left: 0.11px; }
+.kept .slot:first-of-type { margin-top: 11.52px; }
+.kept .slot + .slot { margin-top: 8.04px; }
+</style>
+</head>
+<body>
+<main class="screen">
+
+  <header class="app-head">
+    <span class="wordmark">Make It Right</span>
+    <span class="head-divider" aria-hidden="true"></span>
+    <span class="env-label">PayPal sandbox</span>
+  </header>
+
+  <div class="head-slots">
+    <span class="slot" data-slot="case-title" style="width:230.67px"></span>
+    <span class="slot" data-slot="case-meta" style="width:151.1px"></span>
+  </div>
+
+  <div class="stamp-zone">
+    <div class="stamp" data-field="outcome_status"><span class="stamp-word">Money back</span></div>
+  </div>
+
+  <section class="refund">
+    <span class="refund-amount" data-field="amount_refunded">+$3,150.00</span>
+    <p class="refund-note">refunded to you · back to the bank account you paid with</p>
+  </section>
+
+  <div class="refund-slots">
+    <span class="slot" data-slot="refund-detail" style="width:330.34px"></span>
+    <span class="slot" data-slot="refund-ref" style="width:143.87px"></span>
+  </div>
+
+  <ol class="steps">
+    <li class="step">
+      <svg class="step-mark" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="14"/><path d="M7.6 14.6 L11.6 18.6 L20 10.2"/></svg>
+      <span class="step-text"><span data-field="filed_at">Oct 31</span> · You filed in PayPal · <span data-field="claim_amount">$3,150.00</span></span>
+      <span class="slot" data-slot="step-filed-note" style="width:179.23px"></span>
+    </li>
+    <li class="step">
+      <svg class="step-mark" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="14"/><path d="M7.6 14.6 L11.6 18.6 L20 10.2"/></svg>
+      <span class="step-text"><span data-field="offer_received_at">Nov 2</span> · Offer <span data-field="offer_amount">$1,200.00</span> · <span data-field="offer_status">declined</span></span>
+      <span class="slot" data-slot="step-offer-note" style="width:192.09px"></span>
+    </li>
+    <li class="step">
+      <svg class="step-mark" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="14"/><path d="M7.6 14.6 L11.6 18.6 L20 10.2"/></svg>
+      <span class="step-text"><span data-field="escalated_at">Nov 2</span> · Sent to PayPal</span>
+      <span class="slot" data-slot="step-sent-note" style="width:163.96px"></span>
+    </li>
+    <li class="step">
+      <svg class="step-mark" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="14"/><path d="M7.6 14.6 L11.6 18.6 L20 10.2"/></svg>
+      <span class="step-text"><span data-field="decided_at">Nov 3</span> · <span data-field="outcome_text">Decided in your favor</span></span>
+      <span class="slot" data-slot="step-decided-note" style="width:207.36px"></span>
+    </li>
+  </ol>
+
+  <section class="kept">
+    <p class="kept-title">Kept by <span data-field="payee">Ridgeway</span>: <span data-field="proven_done">$1,050.00</span></p>
+    <p class="kept-sub">for work the photos prove</p>
+    <span class="slot" data-slot="kept-detail" style="width:342.39px"></span>
+    <span class="slot" data-slot="kept-ref" style="width:143.87px"></span>
+  </section>
+
+</main>
+</body>
+</html>

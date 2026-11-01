@@ -36,6 +36,8 @@ export interface CaseView {
     created_at: string;
     payee_name: string;
     paid_at: string | null;
+    /** What the homeowner said they paid; only for cases made by the photo check */
+    paid_amount?: string;
     payment: PaymentRecord | null;
   };
   promised_items: PromisedItem[];
@@ -45,8 +47,10 @@ export interface CaseView {
   dispute: Dispute | null;
   offer: Offer | null;
   outcome: Outcome | null;
-  /** The job-site photos uploaded for the photo check; absent for cases made from JSON */
-  photos?: Array<{ name: string; url: string }>;
+  /** The job-site photos uploaded for the photo check, in the order they were added; absent for cases made from JSON. `id` is what verdict.photo_ref says. */
+  photos?: Array<{ id: string; name: string; url: string }>;
+  /** What the photo check noted while reading the job; only for cases made by the photo check */
+  analysis?: { warnings: string[] };
 }
 
 export interface DisputeState {
@@ -66,7 +70,14 @@ export function caseView(record: CaseRecord, now: Date): CaseView {
     today: now.toISOString().slice(0, 10),
   });
   return {
-    case: { id: record.id, created_at: record.created_at, payee_name: record.payee_name, paid_at: record.paid_at, payment: record.payment },
+    case: {
+      id: record.id,
+      created_at: record.created_at,
+      payee_name: record.payee_name,
+      paid_at: record.paid_at,
+      ...(record.paid_amount === undefined ? {} : { paid_amount: record.paid_amount }),
+      payment: record.payment,
+    },
     promised_items: record.promised_items,
     verdicts: record.verdicts,
     claim,
@@ -78,7 +89,8 @@ export function caseView(record: CaseRecord, now: Date): CaseView {
     dispute: record.dispute,
     offer: record.offer,
     outcome: record.outcome,
-    ...(record.uploads ? { photos: record.uploads.photos.map((name) => ({ name, url: `/api/cases/${record.id}/photos/${name}` })) } : {}),
+    ...(record.uploads ? { photos: record.uploads.photos.map((name) => ({ id: name.replace(/\.[^.]+$/, ''), name, url: `/api/cases/${record.id}/photos/${name}` })) } : {}),
+    ...(record.analysis ? { analysis: record.analysis } : {}),
   };
 }
 
@@ -122,8 +134,8 @@ export class CaseService {
     return this.newId();
   }
 
-  /** `saved` is given by the photo check: the id it took from newCaseId() and the files it saved under that id */
-  async createCase(body: unknown, saved?: { id: string; uploads: Uploads }): Promise<CaseView> {
+  /** `saved` is given by the photo check: the id it took from newCaseId(), the files it saved under that id, and what it noted */
+  async createCase(body: unknown, saved?: { id: string; uploads: Uploads; paid_amount: string; warnings: string[] }): Promise<CaseView> {
     const input = parseCaseInput(body);
     const id = saved?.id ?? this.newId();
     try {
@@ -140,7 +152,7 @@ export class CaseService {
       dispute: null,
       offer: null,
       outcome: null,
-      ...(saved ? { uploads: saved.uploads } : {}),
+      ...(saved ? { uploads: saved.uploads, paid_amount: saved.paid_amount, analysis: { warnings: saved.warnings } } : {}),
     };
     await this.deps.store.put(record);
     return caseView(record, this.now());

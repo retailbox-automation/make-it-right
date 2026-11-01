@@ -1,8 +1,9 @@
 // The HTTP API the screens call. JSON in, JSON out (photos and the estimate come back as the files they are); every error is {error: {code, message}}.
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { HttpError, invalid, notFound } from './errors.js';
-import { maxBodyBytes, sizeText, UPLOAD_LIMITS, type UploadLimits } from './intake.js';
+import { PhotoCheckGate } from './gate.js';
+import { maxBodyBytes, readIntake, sizeText, UPLOAD_LIMITS, type UploadLimits } from './intake.js';
 import type { VisionModel } from './models/vision.js';
 import { analyzeUpload } from './photocheck.js';
 import type { CaseService } from './service.js';
@@ -21,6 +22,10 @@ export interface AppOptions {
   model?: VisionModel;
   /** Size limits of POST /api/cases/analyze; UPLOAD_LIMITS unless a test sets others */
   uploadLimits?: UploadLimits;
+  /** One photo check at a time and a few per client; PhotoCheckGate with its usual settings unless a test sets another */
+  gate?: PhotoCheckGate;
+  /** A proxy in front of the server adds the client's address to X-Forwarded-For (the last entry is taken); otherwise the connection's address counts */
+  trustForwardedFor?: boolean;
 }
 
 /** The JSON body, or undefined when there is none. Present but not JSON is a 400. */
@@ -52,16 +57,32 @@ export function createApp(service: CaseService, options: AppOptions = {}): Hono 
   const small = bodyLimit({ maxSize: MAX_BODY_BYTES, onError: (c) => c.json(tooLarge(MAX_BODY_BYTES), 413) });
   const large = bodyLimit({ maxSize: maxBodyBytes(limits), onError: (c) => c.json(tooLarge(maxBodyBytes(limits)), 413) });
 
-  // Answered before any of the body is read: a server without a model should not take 50 MB to say so
+  const gate = options.gate ?? new PhotoCheckGate();
+  const clientOf = (c: Context): string => {
+    const forwarded = options.trustForwardedFor ? c.req.header('x-forwarded-for')?.split(',').at(-1)?.trim() : undefined;
+    return forwarded || (c.env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined)?.incoming?.socket?.remoteAddress || 'unknown';
+  };
+
+  // Answered before any of the body is read: a server without a model, or one that is busy, should not take 50 MB to say so.
+  // The place in the gate is held until the answer is sent.
   app.use('/api/*', async (c, next) => {
-    if (isAnalyze(c.req.method, c.req.path) && !(model && uploads)) {
-      throw new HttpError(503, 'PHOTO_CHECK_NOT_CONFIGURED', 'the photo check is not configured on this server (MIR_VISION_MODEL is not set)');
+    if (!isAnalyze(c.req.method, c.req.path)) return next();
+    if (!(model && uploads)) throw new HttpError(503, 'PHOTO_CHECK_NOT_CONFIGURED', 'the photo check is not configured on this server (MIR_VISION_MODEL is not set)');
+    const leave = gate.enter(clientOf(c));
+    try {
+      await next();
+    } finally {
+      leave();
     }
-    return next();
   });
   app.use('/api/*', (c, next) => (isAnalyze(c.req.method, c.req.path) ? large(c, next) : small(c, next)));
 
-  app.post(ANALYZE_PATH, async (c) => c.json(await analyzeUpload({ service, model: model!, uploads: uploads!, limits, log }, c.req.raw), 201));
+  app.post(ANALYZE_PATH, async (c) => {
+    const intake = await readIntake(c.req.raw, limits);
+    // Everything in the request is copied into `intake`; do not keep up to 50 MB of request alive while the model works
+    c.req.raw = new Request(c.req.url, { method: 'POST' });
+    return c.json(await analyzeUpload({ service, model: model!, uploads: uploads!, log }, intake), 201);
+  });
   app.post('/api/cases', async (c) => c.json(await service.createCase(await body(c.req.raw)), 201));
   app.get('/api/cases/:id', async (c) => c.json(await service.getCase(c.req.param('id'))));
   app.get('/api/cases/:id/photos/:name', async (c) => {
@@ -83,7 +104,7 @@ export function createApp(service: CaseService, options: AppOptions = {}): Hono 
 
   app.notFound((c) => c.json({ error: { code: 'NOT_FOUND', message: `no route ${c.req.method} ${new URL(c.req.url).pathname}` } }, 404));
   app.onError((error, c) => {
-    if (error instanceof HttpError) return c.json({ error: { code: error.code, message: error.message } }, error.status);
+    if (error instanceof HttpError) return c.json({ error: { code: error.code, message: error.message } }, error.status, error.headers);
     log(`unexpected error on ${c.req.method} ${new URL(c.req.url).pathname}: ${error instanceof Error ? error.message : String(error)}`);
     return c.json({ error: { code: 'INTERNAL', message: 'Internal error' } }, 500);
   });

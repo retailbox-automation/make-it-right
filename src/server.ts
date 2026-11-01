@@ -52,8 +52,12 @@ export async function start(env: Record<string, string | undefined> = process.en
     const model = vision
       ? new OllamaVisionModel({ model: vision.model, baseUrl: vision.baseUrl, numCtx: vision.numCtx, ...(deps.modelFetch ? { fetch: deps.modelFetch } : {}) })
       : undefined;
-    // The uploads are kept beside the cases, in the data directory
-    const app = createApp(service, { log, uploads: new UploadStore(join(config.dataDir, 'uploads')), ...(model ? { model } : {}) });
+    // The uploads are kept beside the cases, in the data directory. What an interrupted run left there is cleared before the first request.
+    const uploads = new UploadStore(join(config.dataDir, 'uploads'), config.uploadQuotaBytes);
+    const openStore = store;
+    const removed = await uploads.sweep(async (caseId) => (await openStore.get(caseId)) !== undefined);
+    if (removed.length) log(`removed leftover upload directories: ${removed.join(', ')}`);
+    const app = createApp(service, { log, uploads, trustForwardedFor: config.trustForwardedFor, ...(model ? { model } : {}) });
 
     poller = config.pollSeconds
       ? startPoller(() => tracker.tickOpenCases(), config.pollSeconds * 1000, (e) => log(`poller: ${e instanceof Error ? e.message : String(e)}`))
@@ -66,7 +70,6 @@ export async function start(env: Record<string, string | undefined> = process.en
       listening.once('listening', () => resolve((listening.address() as { port: number }).port));
     });
 
-    const openStore = store;
     let stopped = false;
     return {
       port,

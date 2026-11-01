@@ -10,8 +10,10 @@ import { KeyedLock } from '../src/lock.js';
 import { ModelError, type VisionModel } from '../src/models/vision.js';
 import { TITLE_LIMIT } from '../src/paypal/orders.js';
 import { CaseService } from '../src/service.js';
+import { PhotoCheckGate } from '../src/gate.js';
 import { UploadStore } from '../src/uploads.js';
 import { fakeModel, JPEG_HEAD, PNG_1PX } from './helpers.js';
+import { buildPdf, flate, spaces } from './helpers/pdf.js';
 import { file, MINI_EXTRACTED, MINI_JOB, MINI_JUDGED, miniForm } from './helpers/upload.js';
 import { makeWorld } from './helpers/world.js';
 
@@ -25,6 +27,9 @@ interface Options {
   uploadLimits?: UploadLimits;
   /** Leave the upload store out of the app */
   withoutUploads?: boolean;
+  gate?: PhotoCheckGate;
+  trustForwardedFor?: boolean;
+  quotaBytes?: number;
 }
 
 /** An app on a fresh temp "data directory"; case ids are case-1, case-2, ... */
@@ -32,7 +37,7 @@ function setup(options: Options = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'mir-analyze-'));
   dirs.push(dir);
   const uploadsDir = join(dir, 'uploads');
-  const uploads = new UploadStore(uploadsDir);
+  const uploads = new UploadStore(uploadsDir, options.quotaBytes);
   const world = makeWorld();
   const locks = new KeyedLock();
   const tracker = new Tracker({ store: world.store, paypal: world.client, locks });
@@ -48,11 +53,14 @@ function setup(options: Options = {}) {
     ...(options.withoutUploads ? {} : { uploads }),
     ...(options.model ? { model: options.model } : {}),
     ...(options.uploadLimits ? { uploadLimits: options.uploadLimits } : {}),
+    ...(options.gate ? { gate: options.gate } : {}),
+    ...(options.trustForwardedFor ? { trustForwardedFor: true } : {}),
   });
   return { app, world, dir, uploads, uploadsDir, logged };
 }
 
-const post = (app: ReturnType<typeof setup>['app'], form: FormData) => app.request('/api/cases/analyze', { method: 'POST', body: form });
+const post = (app: ReturnType<typeof setup>['app'], form: FormData, headers?: Record<string, string>) =>
+  app.request('/api/cases/analyze', { method: 'POST', body: form, ...(headers ? { headers } : {}) });
 const json = async (res: Response) => (await res.json()) as any;
 const bytesOf = async (res: Response) => Buffer.from(await res.arrayBuffer());
 const filesOf = (dir: string) => (existsSync(dir) ? readdirSync(dir) : []);
@@ -109,9 +117,10 @@ describe('POST /api/cases/analyze', () => {
       const { app, uploadsDir } = setup({ model: fakeModel([MINI_EXTRACTED, MINI_JUDGED]) });
       const body = await json(await post(app, miniForm()));
       expect(body.photos).toEqual([
-        { name: 'photo-1.png', url: '/api/cases/case-1/photos/photo-1.png' },
-        { name: 'photo-2.png', url: '/api/cases/case-1/photos/photo-2.png' },
+        { id: 'photo-1', name: 'photo-1.png', url: '/api/cases/case-1/photos/photo-1.png' },
+        { id: 'photo-2', name: 'photo-2.png', url: '/api/cases/case-1/photos/photo-2.png' },
       ]);
+      expect(body.photos.map((p: any) => p.id)).toEqual(body.verdicts.filter((v: any) => v.photo_ref).map((v: any) => v.photo_ref)); // what a verdict says is what a photo is called
       expect(readdirSync(join(uploadsDir, 'case-1')).sort()).toEqual(['estimate.pdf', 'photo-1.png', 'photo-2.png']);
 
       for (const [index, photo] of body.photos.entries()) {
@@ -127,13 +136,16 @@ describe('POST /api/cases/analyze', () => {
       expect(await bytesOf(estimate)).toEqual(MINI_JOB.estimate);
     });
 
-    it('gives the same case back on GET, photos included', async () => {
+    it('gives the same case back on GET: photos, what was typed as paid and what the check noted', async () => {
       const { app } = setup({ model: fakeModel([MINI_EXTRACTED, MINI_JUDGED]) });
-      const made = await json(await post(app, miniForm()));
+      const made = await json(await post(app, edited((f) => f.set('paid_amount', '2500'))));
+      expect(made.case.paid_amount).toBe('2500.00');
+      expect(made.analysis.warnings).toEqual(['the promised items add up to $2,200.00, but the payment was $2,500.00']);
       const again = await json(await app.request('/api/cases/case-1'));
       expect(again.claim).toEqual(made.claim);
       expect(again.photos).toEqual(made.photos);
-      expect(again).not.toHaveProperty('analysis');
+      expect(again.case.paid_amount).toBe('2500.00');
+      expect(again.analysis).toEqual({ warnings: made.analysis.warnings }); // the timings belong to the one request
     });
 
     it('stores a JPEG as .jpg and an image estimate as an image, and serves each with its own type', async () => {
@@ -213,6 +225,42 @@ describe('POST /api/cases/analyze', () => {
       expect(model.requests[0]!.prompt).toContain('Text messages (date · sender: message):\n(none)');
     });
 
+    it('leaves an item that costs nothing off the punch list, with its verdict, and says so', async () => {
+      const [toilet, doors, tile] = MINI_EXTRACTED.items;
+      const extracted = { items: [toilet!, doors!, { ...tile!, price: '0.00' }] }; // "tile the floor: included"
+      const body = await json(await post(setup({ model: fakeModel([extracted, MINI_JUDGED]) }).app, miniForm()));
+      expect(body.promised_items.map((i: any) => i.id)).toEqual(['1', '2']);
+      expect(body.verdicts.map((v: any) => v.item_id)).toEqual(['1', '2']);
+      expect(body.claim).toMatchObject({ amount: '350.00', paid_total: '1500.00', proven_done: '1150.00' });
+      expect(body.analysis.warnings).toEqual([
+        'the promised items add up to $1,500.00, but the payment was $2,200.00',
+        'item 3 ("Tile bathroom floor"): the price is $0.00, so it is left off the punch list',
+      ]);
+    });
+
+    it('counts an impossible quantity as 1 and keeps the verdict true to that', async () => {
+      const [toilet, doors, tile] = MINI_EXTRACTED.items;
+      const extracted = { items: [{ ...toilet!, qty: 5000 }, { ...doors!, qty: 3000 }, tile!] };
+      const judged = {
+        verdicts: [
+          { item_id: '1', photo_ref: 'photo-1', note: '', status: 'done', done_units: 5000 },
+          { item_id: '2', photo_ref: 'photo-2', note: 'some doors hung', status: 'partial', done_units: 1000 },
+          MINI_JUDGED.verdicts[2],
+        ],
+      };
+      const res = await post(setup({ model: fakeModel([extracted, judged]) }).app, miniForm());
+      expect(res.status).toBe(201);
+      const body = await json(res);
+      expect(body.promised_items.map((i: any) => [i.id, i.qty, i.price])).toEqual([['1', 1, '450.00'], ['2', 1, '1050.00'], ['3', 1, '700.00']]);
+      expect(body.verdicts.map((v: any) => [v.item_id, v.status, v.done_units, v.fraction])).toEqual([['1', 'done', 1, null], ['2', 'not_done', 0, null], ['3', 'unclear', 0, null]]);
+      expect(body.claim).toMatchObject({ amount: '1750.00', proven_done: '450.00', paid_total: '2200.00' }); // the doors and the tile stay in
+      expect(body.analysis.warnings).toEqual([
+        'item 1: quantity 5000 is more than 1000; it is counted as 1, and the price is the total for the item',
+        'item 2: quantity 3000 is more than 1000; it is counted as 1, and the price is the total for the item',
+        'item 2: "partly done" cannot be kept for a quantity of 1; it stays in the claim as not done',
+      ]);
+    });
+
     it('shortens text the model wrote when it is longer than a case accepts, and says so', async () => {
       const [first, ...others] = MINI_EXTRACTED.items;
       const extracted = { items: [{ ...first!, title: 'T'.repeat(600), source: { ...(first!.source as object), quote: 'Q'.repeat(501) } }, ...others] };
@@ -249,17 +297,24 @@ describe('POST /api/cases/analyze', () => {
       const failures = [
         new ModelError('timeout', 'gemma: no answer in 300000 ms'),
         new ModelError('invalid_json', 'gemma: answer is not JSON after 2 attempts'),
-        new ModelError('network', 'gemma: http://localhost:11434 unreachable'),
-        new ModelError('http', 'gemma: HTTP 500'),
+        new ModelError('network', 'gemma: http://10.1.2.3:11434 unreachable'),
+        new ModelError('http', 'gemma: HTTP 500: {"error":"model requires more system memory"}'),
       ];
       for (const failure of failures) {
         const ctx = setup({ model: fakeModel([failure]) });
         const res = await post(ctx.app, miniForm());
         expect(res.status, failure.kind).toBe(502);
-        expect(await json(res)).toEqual({ error: { code: 'PHOTO_CHECK_FAILED', message: `the photo check failed (${failure.kind}): ${failure.message}` } });
+        expect(await json(res)).toEqual({ error: { code: 'PHOTO_CHECK_FAILED', message: `the photo check could not be completed (${failure.kind}); try again in a few minutes` } });
         await nothingStored(ctx);
-        expect(ctx.logged.join('\n')).toContain(failure.kind);
+        expect(ctx.logged).toContain(`photo check failed (${failure.kind}): ${failure.message}`); // the whole message is for the log
       }
+    });
+
+    it('does not pass the model server\'s address or its answer on to the caller', async () => {
+      const failure = new ModelError('http', 'gemma: http://10.1.2.3:11434 said: SECRET-DETAIL', 'raw answer');
+      const res = await post(setup({ model: fakeModel([failure]) }).app, miniForm());
+      const text = JSON.stringify(await json(res));
+      for (const leak of ['10.1.2.3', '11434', 'SECRET-DETAIL', 'raw answer', 'gemma']) expect(text).not.toContain(leak);
     });
 
     it('answers 502 when the second call fails, after the items were read', async () => {
@@ -272,7 +327,7 @@ describe('POST /api/cases/analyze', () => {
       const ctx = setup({ model: fakeModel([{ unexpected: true }]) });
       const res = await post(ctx.app, miniForm());
       expect(res.status).toBe(502);
-      expect((await json(res)).error.message).toMatch(/invalid_output/);
+      expect((await json(res)).error.message).toBe('the photo check could not be completed (invalid_output); try again in a few minutes');
       await nothingStored(ctx);
     });
 
@@ -299,9 +354,9 @@ describe('POST /api/cases/analyze', () => {
     it('answers 422 when the case cannot take what was found, and removes the files it had saved', async () => {
       const [first, ...others] = MINI_EXTRACTED.items;
       const tooMany = { items: Array.from({ length: 51 }, () => first!) };
-      const free = { items: [{ ...first!, price: '0.00' }, ...others] };
+      const tooDear = { items: [{ ...first!, price: '12345678901.00' }, ...others] }; // 11 digits before the decimal point
       for (const [extracted, message] of [
-        [free, /item 1: price must be more than zero/],
+        [tooDear, /item 1: price must be an amount like/],
         [tooMany, /at most 50 items/],
       ] as const) {
         const ctx = setup({ model: fakeModel([extracted, { verdicts: [] }]) });
@@ -316,6 +371,42 @@ describe('POST /api/cases/analyze', () => {
         expect(remove).toHaveBeenCalledWith('case-1'); // ... and taken away again
         await nothingStored(ctx);
       }
+    });
+
+    it('answers 422 when every item turns out to cost nothing', async () => {
+      const free = { items: MINI_EXTRACTED.items.map((item) => ({ ...item, price: '0.00' })) };
+      const ctx = setup({ model: fakeModel([free, { verdicts: [] }]) });
+      const res = await post(ctx.app, miniForm());
+      expect(res.status).toBe(422);
+      const { error } = await json(res);
+      expect(error.code).toBe('NO_PROMISED_ITEMS');
+      expect(error.message).toContain('item 1 ("New toilet installed"): the price is $0.00');
+      await nothingStored(ctx);
+    });
+
+    describe('an estimate PDF that is too much work to read', () => {
+      const withEstimate = (pdf: Buffer) => edited((f) => f.set('estimate', file(pdf, 'estimate.pdf', 'application/pdf')));
+      const hostile: Array<[string, Buffer, RegExp]> = [
+        ['a file of 40 KB that unpacks to 40 MB', buildPdf({ content: { dict: '/Filter /FlateDecode', data: flate(spaces(40)) } }), /unpacks to more than 20 MB/],
+        ['a file with 21 pages', buildPdf({ content: 'first', morePages: 20 }), /21 pages, and at most 20/],
+        ['a file with 50,000 blank pages', buildPdf({ content: 'first', blankPages: 50_000 }), /50001 pages/],
+        ['a file with an LZW stream', buildPdf({ content: { dict: '/Filter /LZWDecode', data: Buffer.from('abc') } }), /cannot be checked for size/],
+      ];
+
+      it.each(hostile)('answers 400 ESTIMATE_TOO_COMPLEX for %s, quickly, without asking the model or keeping anything', async (_name, pdf, message) => {
+        const model = fakeModel([]);
+        const ctx = setup({ model });
+        const since = performance.now();
+        const res = await post(ctx.app, withEstimate(pdf));
+        expect(performance.now() - since).toBeLessThan(8000);
+        expect(res.status).toBe(400);
+        const { error } = await json(res);
+        expect(error.code).toBe('ESTIMATE_TOO_COMPLEX');
+        expect(error.message).toMatch(/^the estimate is too complex to read: /);
+        expect(error.message).toMatch(message);
+        expect(model.requests).toHaveLength(0);
+        await nothingStored(ctx);
+      });
     });
 
     it('answers 400 for an estimate PDF that cannot be read, without asking the model', async () => {
@@ -398,6 +489,116 @@ describe('POST /api/cases/analyze', () => {
       const other = await ctx.app.request('/api/cases', { method: 'POST', headers: { 'content-type': 'application/json' }, body: ' '.repeat(256 * 1024 + 1) });
       expect(other.status).toBe(413);
       expect((await json(other)).error.message).toBe('the request body is larger than 256 KB');
+    });
+  });
+
+  describe('one check at a time, and a few per client', () => {
+    /** A model that waits until `release()` before it answers the first question */
+    function heldModel(answers: unknown[]) {
+      const inner = fakeModel(answers);
+      let release!: () => void;
+      let entered!: () => void;
+      const hold = new Promise<void>((resolve) => (release = resolve));
+      const started = new Promise<void>((resolve) => (entered = resolve));
+      const model: VisionModel = {
+        name: 'held',
+        async json<T>(req: Parameters<VisionModel['json']>[0]) {
+          entered();
+          await hold;
+          return inner.json<T>(req);
+        },
+      };
+      return { model, release, started };
+    }
+    const noEstimate = () => edited((f) => f.delete('estimate')); // fails at once, which is all these tests need of a request
+
+    it('turns a second check away while the first one runs, with Retry-After, and takes the next one after', async () => {
+      const held = heldModel([MINI_EXTRACTED, MINI_JUDGED]);
+      const ctx = setup({ model: held.model });
+      const first = post(ctx.app, miniForm());
+      await held.started;
+
+      const second = await post(ctx.app, miniForm());
+      expect(second.status).toBe(429);
+      expect(second.headers.get('retry-after')).toBe('60');
+      expect(await json(second)).toEqual({ error: { code: 'PHOTO_CHECK_BUSY', message: 'another photo check is running; try again in a minute' } });
+      expect(await ctx.world.store.list()).toEqual([]); // the first one has not finished
+
+      held.release();
+      expect((await first).status).toBe(201);
+      expect((await ctx.app.request('/api/cases/case-1')).status).toBe(200);
+      expect(readdirSync(ctx.uploadsDir)).toEqual(['case-1']); // the turned-away check left nothing
+    });
+
+    it('turns it away before reading its body', async () => {
+      const held = heldModel([MINI_EXTRACTED, MINI_JUDGED]);
+      const ctx = setup({ model: held.model });
+      const first = post(ctx.app, miniForm());
+      await held.started;
+      const announced = await ctx.app.request('/api/cases/analyze', { method: 'POST', headers: { 'content-type': 'multipart/form-data; boundary=x', 'content-length': String(500 * 1024 * 1024) }, body: 'x' });
+      expect(announced.status).toBe(429); // not 413
+      held.release();
+      await first;
+    });
+
+    it('frees the place when a check ends any other way: bad input, a model failure, a crash', async () => {
+      const ctx = setup({ model: fakeModel([new ModelError('timeout', 'slow'), new Error('boom'), MINI_EXTRACTED, MINI_JUDGED]) });
+      expect((await post(ctx.app, noEstimate())).status).toBe(400);
+      expect((await post(ctx.app, miniForm())).status).toBe(502);
+      expect((await post(ctx.app, miniForm())).status).toBe(500);
+      expect((await post(ctx.app, miniForm())).status).toBe(201);
+    });
+
+    it('allows a client 5 checks in 10 minutes, then says when to come back', async () => {
+      let now = 1_000_000;
+      const ctx = setup({ model: fakeModel([]), gate: new PhotoCheckGate({ now: () => now }) });
+      for (let i = 0; i < 5; i++) expect((await post(ctx.app, noEstimate())).status, `check ${i + 1}`).toBe(400);
+      const sixth = await post(ctx.app, noEstimate());
+      expect(sixth.status).toBe(429);
+      expect(sixth.headers.get('retry-after')).toBe('120'); // one more check every 2 minutes
+      expect((await json(sixth)).error).toEqual({ code: 'RATE_LIMITED', message: 'too many photo checks from this address; try again in 2 minute(s)' });
+
+      now += 120_000;
+      expect((await post(ctx.app, noEstimate())).status).toBe(400);
+      expect((await post(ctx.app, noEstimate())).status).toBe(429);
+    });
+
+    it('counts clients apart by the address a trusted proxy reports, and ignores that header otherwise', async () => {
+      const gate = () => new PhotoCheckGate({ burst: 1, now: () => 0 });
+      const from = (address: string) => ({ 'x-forwarded-for': `203.0.113.99, ${address}` }); // the proxy appends the real address last
+
+      const trusting = setup({ model: fakeModel([]), gate: gate(), trustForwardedFor: true });
+      expect((await post(trusting.app, noEstimate(), from('198.51.100.1'))).status).toBe(400);
+      expect((await post(trusting.app, noEstimate(), from('198.51.100.1'))).status).toBe(429);
+      expect((await post(trusting.app, noEstimate(), from('198.51.100.2'))).status).toBe(400); // another client
+
+      const careless = setup({ model: fakeModel([]), gate: gate() });
+      expect((await post(careless.app, noEstimate(), from('198.51.100.1'))).status).toBe(400);
+      expect((await post(careless.app, noEstimate(), from('198.51.100.2'))).status).toBe(429); // a made-up header buys nothing
+    });
+  });
+
+  describe('the room for uploads', () => {
+    it('refuses a check that would take the uploads over the quota, before the model is asked', async () => {
+      const model = fakeModel([MINI_EXTRACTED, MINI_JUDGED]);
+      const jobBytes = MINI_JOB.estimate.length + MINI_JOB.photos[0]!.length + MINI_JOB.photos[1]!.length;
+      const ctx = setup({ model, quotaBytes: jobBytes * 2 - 1 });
+      expect((await post(ctx.app, miniForm())).status).toBe(201);
+      expect(await ctx.uploads.usedBytes()).toBe(jobBytes);
+
+      const res = await post(ctx.app, miniForm());
+      expect(res.status).toBe(507);
+      expect(await json(res)).toEqual({ error: { code: 'UPLOAD_QUOTA_EXCEEDED', message: 'the server has no room for more uploads right now' } });
+      expect(model.requests).toHaveLength(2); // only the first check asked
+      expect(readdirSync(ctx.uploadsDir)).toEqual(['case-1']);
+      expect(await ctx.world.store.list()).toHaveLength(1);
+    });
+
+    it('takes a check that fits exactly', async () => {
+      const jobBytes = MINI_JOB.estimate.length + MINI_JOB.photos[0]!.length + MINI_JOB.photos[1]!.length;
+      const ctx = setup({ model: fakeModel([MINI_EXTRACTED, MINI_JUDGED, MINI_EXTRACTED, MINI_JUDGED]), quotaBytes: jobBytes * 2 });
+      expect((await post(ctx.app, miniForm())).status).toBe(201);
+      expect((await post(ctx.app, miniForm())).status).toBe(201);
     });
   });
 

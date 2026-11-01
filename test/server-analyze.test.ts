@@ -1,11 +1,12 @@
 // The photo check through the real server: environment settings, a real HTTP upload, a fake Ollama, a fake PayPal, a temp MIR_DATA_DIR.
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { start, type RunningServer } from '../src/server.js';
 import { fakePayPal } from './helpers/fake-paypal.js';
-import { MINI_EXTRACTED, MINI_JOB, MINI_JUDGED, miniForm } from './helpers/upload.js';
+import { PNG_1PX } from './helpers.js';
+import { file, MINI_EXTRACTED, MINI_JOB, MINI_JUDGED, miniForm } from './helpers/upload.js';
 
 const running: RunningServer[] = [];
 const dirs: string[] = [];
@@ -36,12 +37,13 @@ async function boot(env: Record<string, string> = {}, answers: Array<unknown> = 
   const root = dir ?? mkdtempSync(join(tmpdir(), 'mir-server-analyze-'));
   if (!dir) dirs.push(root);
   const ollama = fakeOllama(answers);
+  const logs: string[] = [];
   const server = await start(
     { PAYPAL_SANDBOX_CLIENT_ID: 'id', PAYPAL_SANDBOX_CLIENT_SECRET: 'secret-value', PORT: '0', MIR_DATA_DIR: join(root, 'db'), ...env },
-    { fetch: fakePayPal().fetch, modelFetch: ollama.fetch, log: () => undefined },
+    { fetch: fakePayPal().fetch, modelFetch: ollama.fetch, log: (m) => logs.push(m) },
   );
   running.push(server);
-  return { server, ollama, root, dataDir: join(root, 'db'), base: `http://127.0.0.1:${server.port}` };
+  return { server, ollama, logs, root, dataDir: join(root, 'db'), base: `http://127.0.0.1:${server.port}` };
 }
 
 const analyze = (base: string, form: FormData = miniForm()) => fetch(`${base}/api/cases/analyze`, { method: 'POST', body: form });
@@ -122,5 +124,57 @@ describe('POST /api/cases/analyze on the running server', () => {
       start({ PAYPAL_SANDBOX_CLIENT_ID: 'id', PAYPAL_SANDBOX_CLIENT_SECRET: 's', PORT: '0', MIR_DATA_DIR: join(dir, 'db'), MIR_VISION_MODEL: 'gemma4:31b' }, { log: () => undefined }),
     ).rejects.toThrow(/MIR_VISION_MODEL/);
     expect(existsSync(join(dir, 'db'))).toBe(false);
+  });
+
+  it('clears what an interrupted run left in the uploads directory when it starts, and keeps the uploads of known cases', async () => {
+    const first = await boot({ MIR_VISION_MODEL: 'ollama:m' });
+    const { case: made } = (await (await analyze(first.base)).json()) as { case: { id: string } };
+    await first.server.stop();
+    running.pop();
+
+    const uploads = join(first.dataDir, 'uploads');
+    mkdirSync(join(uploads, 'ghost-case'));
+    writeFileSync(join(uploads, 'ghost-case', 'photo-1.png'), PNG_1PX);
+    mkdirSync(join(uploads, '.incoming-Zz9Yy8'));
+    writeFileSync(join(uploads, '.incoming-Zz9Yy8', 'estimate.pdf'), MINI_JOB.estimate);
+
+    const second = await boot({}, [], first.root);
+    expect(readdirSync(uploads)).toEqual([made.id]);
+    expect(second.logs).toContain('removed leftover upload directories: .incoming-Zz9Yy8, ghost-case');
+    expect((await fetch(`${second.base}/api/cases/${made.id}/photos/photo-1.png`)).status).toBe(200);
+  });
+
+  it('refuses a check that would take the uploads over MIR_UPLOADS_QUOTA_MB', async () => {
+    const { base, ollama, dataDir } = await boot({ MIR_VISION_MODEL: 'ollama:m', MIR_UPLOADS_QUOTA_MB: '1' });
+    const big = (size: number) => Buffer.concat([PNG_1PX.subarray(0, 8), Buffer.alloc(size - 8, 1)]);
+    const form = miniForm();
+    form.delete('photos');
+    form.append('photos', file(big(600 * 1024), 'a.png', 'image/png'));
+    form.append('photos', file(big(600 * 1024), 'b.png', 'image/png'));
+    const res = await analyze(base, form);
+    expect(res.status).toBe(507);
+    expect(((await res.json()) as any).error.code).toBe('UPLOAD_QUOTA_EXCEEDED');
+    expect(ollama.calls).toEqual([]);
+    expect(existsSync(join(dataDir, 'uploads', 'case-1'))).toBe(false);
+  });
+
+  it('counts clients by X-Forwarded-For only when MIR_TRUST_FORWARDED_FOR is set', async () => {
+    const noEstimate = () => {
+      const form = miniForm();
+      form.delete('estimate');
+      return form;
+    };
+    const call = (base: string, address: string) => fetch(`${base}/api/cases/analyze`, { method: 'POST', body: noEstimate(), headers: { 'x-forwarded-for': address } });
+
+    const trusting = await boot({ MIR_VISION_MODEL: 'ollama:m', MIR_TRUST_FORWARDED_FOR: '1' });
+    for (let i = 0; i < 5; i++) expect((await call(trusting.base, '198.51.100.1')).status).toBe(400);
+    const sixth = await call(trusting.base, '198.51.100.1');
+    expect(sixth.status).toBe(429);
+    expect(sixth.headers.get('retry-after')).toBe('120');
+    expect((await call(trusting.base, '198.51.100.2')).status).toBe(400);
+
+    const careless = await boot({ MIR_VISION_MODEL: 'ollama:m' });
+    for (let i = 0; i < 5; i++) expect((await call(careless.base, `198.51.100.${i}`)).status).toBe(400);
+    expect((await call(careless.base, '198.51.100.99')).status).toBe(429); // one connection address, whatever the header says
   });
 });

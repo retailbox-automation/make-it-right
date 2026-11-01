@@ -16,7 +16,7 @@ export interface Source {
 
 /** One line of the punch list: what the contractor promised and was paid for. */
 export interface PromisedItem {
-  /** Stable within a case: "1".."n" */
+  /** "1".."n" as the items were read, unique within a case; an item left off the punch list (a price of $0.00) leaves a gap */
   id: string;
   title: string;
   /** Units promised; 1 for work that cannot be split */
@@ -158,4 +158,8 @@ export interface CaseRecord {
   outcome: Outcome | null;
   /** Files the homeowner uploaded for the photo check; absent for cases made from JSON */
   uploads?: Uploads;
+  /** What the homeowner said they paid ("2200.00"); may differ from the sum of the items, see analysis.warnings. Absent for cases made from JSON. */
+  paid_amount?: string;
+  /** What the photo check noted while reading the job. Absent for cases made from JSON. */
+  analysis?: { warnings: string[] };
 }

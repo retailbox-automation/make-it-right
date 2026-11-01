@@ -62,6 +62,9 @@ describe('judgeWhole', () => {
     expect(prompt).toContain('never partial');
     expect(prompt).toContain("The contractor's words are never proof");
     expect(prompt).not.toMatch(/\blines?\b/i);
+    const props = (model.requests[0]!.schema as any).properties.verdicts.items.properties;
+    expect(props.item_id.enum).toEqual(['1', '2', '3', '4']);
+    expect(props.photo_ref.enum).toEqual(['photo-1', 'photo-2', 'photo-3', '']);
     expect(r.verdicts.map((v) => [v.item_id, v.status, v.done_units, v.fraction, v.photo_ref])).toEqual([
       ['1', 'done', 4, null, 'photo-1'],
       ['2', 'done', 1, null, 'photo-2'],
@@ -115,6 +118,7 @@ describe('judgePerPhoto', () => {
     const r = await judgePerPhoto(model, ITEMS, PHOTOS);
     expect(model.requests.map((q) => q.images)).toEqual(PHOTOS.map((p) => [p.image]));
     expect(model.requests[1]!.prompt).toContain('One job-site photo is attached: photo-2.');
+    expect((model.requests[0]!.schema as any).properties.shows.items.properties.item_id.enum).toEqual(['1', '2', '3', '4']);
     expect(r.verdicts.map((v) => [v.item_id, v.status, v.done_units, v.photo_ref])).toEqual([
       ['1', 'done', 4, 'photo-2'],
       ['2', 'done', 1, 'photo-3'],

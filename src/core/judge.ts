@@ -102,26 +102,29 @@ function unclear(item: PromisedItem, note: string): Verdict {
 
 // ---------- whole job: one call with all photos ----------
 
-export const WHOLE_SCHEMA = {
-  type: 'object',
-  properties: {
-    verdicts: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          item_id: { type: 'string' },
-          photo_ref: { type: 'string' },
-          note: { type: 'string' },
-          status: { type: 'string', enum: [...STATUSES] },
-          done_units: { type: 'integer' },
+// Ids and photo names are enums of this job's values: without that, a local model was seen writing "।1" for item 1.
+export function wholeSchema(items: PromisedItem[], photos: Photo[]) {
+  return {
+    type: 'object',
+    properties: {
+      verdicts: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            item_id: { type: 'string', enum: items.map((i) => i.id) },
+            photo_ref: { type: 'string', enum: [...photos.map((p) => p.id), ''] },
+            note: { type: 'string' },
+            status: { type: 'string', enum: [...STATUSES] },
+            done_units: { type: 'integer' },
+          },
+          required: ['item_id', 'photo_ref', 'note', 'status', 'done_units'],
         },
-        required: ['item_id', 'photo_ref', 'note', 'status', 'done_units'],
       },
     },
-  },
-  required: ['verdicts'],
-} as const;
+    required: ['verdicts'],
+  };
+}
 
 export function wholePrompt(items: PromisedItem[], photos: Photo[]): string {
   return [
@@ -149,7 +152,7 @@ export async function judgeWhole(model: VisionModel, items: PromisedItem[], phot
     system: JUDGE_SYSTEM,
     prompt: wholePrompt(items, photos),
     images: photos.map((p) => p.image),
-    schema: WHOLE_SCHEMA,
+    schema: wholeSchema(items, photos),
     maxTokens: 4096,
   });
   const list = (value as { verdicts?: unknown } | null)?.verdicts;
@@ -181,25 +184,27 @@ export async function judgeWhole(model: VisionModel, items: PromisedItem[], phot
 
 // ---------- one call per photo, combined in code ----------
 
-export const PHOTO_SCHEMA = {
-  type: 'object',
-  properties: {
-    shows: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          item_id: { type: 'string' },
-          note: { type: 'string' },
-          state: { type: 'string', enum: ['finished', 'not_finished'] },
-          finished_units: { type: 'integer' },
+export function photoSchema(items: PromisedItem[]) {
+  return {
+    type: 'object',
+    properties: {
+      shows: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            item_id: { type: 'string', enum: items.map((i) => i.id) },
+            note: { type: 'string' },
+            state: { type: 'string', enum: ['finished', 'not_finished'] },
+            finished_units: { type: 'integer' },
+          },
+          required: ['item_id', 'note', 'state', 'finished_units'],
         },
-        required: ['item_id', 'note', 'state', 'finished_units'],
       },
     },
-  },
-  required: ['shows'],
-} as const;
+    required: ['shows'],
+  };
+}
 
 export function photoPrompt(items: PromisedItem[], photo: Photo): string {
   return [
@@ -255,7 +260,7 @@ export async function judgePerPhoto(model: VisionModel, items: PromisedItem[], p
       system: JUDGE_SYSTEM,
       prompt: photoPrompt(items, photo),
       images: [photo.image],
-      schema: PHOTO_SCHEMA,
+      schema: photoSchema(items),
       maxTokens: 2048,
     });
     ms += answer.ms;

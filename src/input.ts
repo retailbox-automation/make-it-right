@@ -22,7 +22,7 @@ const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
 const text = (v: unknown): v is string => typeof v === 'string' && v.trim() !== '';
 
 /** A string field within the length limit; `max` is 500 unless the field has a smaller one */
-function short(value: string, label: string, max: number = LIMITS.maxString): string {
+export function short(value: string, label: string, max: number = LIMITS.maxString): string {
   if (value.length > max) throw invalid(`${label} is longer than ${max} characters`);
   return value;
 }
@@ -45,7 +45,7 @@ export function parseNote(value: unknown, fallback: string): string {
 }
 
 /** YYYY-MM-DD that is a real calendar day: it must survive a round trip through a date */
-function isCalendarDay(value: unknown): value is string {
+export function isCalendarDay(value: unknown): value is string {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const time = Date.parse(`${value}T00:00:00Z`);
   return Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === value;

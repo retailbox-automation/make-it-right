@@ -1,7 +1,7 @@
 // Errors the HTTP layer turns into status codes.
 export class HttpError extends Error {
   constructor(
-    readonly status: 400 | 403 | 404 | 409 | 413 | 502,
+    readonly status: 400 | 403 | 404 | 409 | 413 | 422 | 502 | 503,
     readonly code: string,
     message: string,
   ) {

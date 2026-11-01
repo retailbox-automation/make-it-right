@@ -1,0 +1,9 @@
+{
+  "links": [
+    {
+      "href": "https://api-m.sandbox.paypal.com/v1/customer/disputes/PP-R-HAX-10195521",
+      "rel": "detail",
+      "method": "GET"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "id": "5X6481368Y377541C",
+  "status": "PAYER_ACTION_REQUIRED",
+  "payment_source": {
+    "paypal": {}
+  },
+  "links": [
+    {
+      "href": "https://api.sandbox.paypal.com/v2/checkout/orders/5X6481368Y377541C",
+      "rel": "self",
+      "method": "GET"
+    },
+    {
+      "href": "https://www.sandbox.paypal.com/checkoutnow?token=5X6481368Y377541C",
+      "rel": "payer-action",
+      "method": "GET"
+    }
+  ]
+}

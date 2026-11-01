@@ -1,0 +1,12 @@
+{
+  "name": "INVALID_REQUEST",
+  "message": "Request is not well-formed, syntactically incorrect, or violates schema.",
+  "debug_id": "f842259c3622a",
+  "information_link": "https://developer.paypal.com/docs/api/customer-disputes/v1/#errors",
+  "details": [
+    {
+      "issue": "ACTION_NOT_ALLOWED_IN_CURRENT_DISPUTE_STATE"
+    }
+  ],
+  "links": []
+}

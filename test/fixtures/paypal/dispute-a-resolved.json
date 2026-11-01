@@ -1,0 +1,227 @@
+{
+  "dispute_id": "PP-R-HAX-10195521",
+  "create_time": "2026-10-31T18:25:35.592Z",
+  "update_time": "2026-10-31T18:33:03.460Z",
+  "disputed_transactions": [
+    {
+      "buyer_transaction_id": "27S431280V029084G",
+      "seller_transaction_id": "9UA851170T503222E",
+      "create_time": "2026-10-31T18:19:08.000Z",
+      "transaction_status": "PARTIALLY_REFUNDED",
+      "gross_amount": {
+        "currency_code": "USD",
+        "value": "600.00"
+      },
+      "invoice_number": "MIR-B1-A-1793470671",
+      "custom": "MIR-B1-A",
+      "buyer": {
+        "payer_id": "CGNMVM83WH4LU",
+        "name": "John Doe"
+      },
+      "seller": {
+        "merchant_id": "6QXSQHL32L686",
+        "name": "Test Store"
+      },
+      "items": [
+        {
+          "item_name": "Install bathroom exhaust fan",
+          "item_description": "Install bathroom exhaust fan",
+          "item_quantity": "1",
+          "reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
+          "item_type": "SERVICE"
+        },
+        {
+          "item_name": "Tile shower walls",
+          "item_description": "Tile shower walls",
+          "item_quantity": "1",
+          "reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
+          "item_type": "SERVICE"
+        },
+        {
+          "item_name": "Install vanity and faucet",
+          "item_description": "Install vanity and faucet",
+          "item_quantity": "1",
+          "reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
+          "item_type": "SERVICE"
+        },
+        {
+          "item_name": "Paint walls and trim",
+          "item_description": "Paint walls and trim",
+          "item_quantity": "1",
+          "reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
+          "item_type": "SERVICE"
+        }
+      ],
+      "seller_protection_eligible": true,
+      "seller_protection_type": "EXPANDED_SELLER_PROTECTION"
+    }
+  ],
+  "reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
+  "status": "RESOLVED",
+  "dispute_amount": {
+    "currency_code": "USD",
+    "value": "300.00"
+  },
+  "dispute_state": "RESOLVED",
+  "dispute_outcome": {
+    "outcome_code": "RESOLVED_BUYER_FAVOUR",
+    "outcome_reason": "INQUIRY_OFFER_PARTIAL_REFUND",
+    "amount_refunded": {
+      "currency_code": "USD",
+      "value": "300.00"
+    }
+  },
+  "money_movements": [
+    {
+      "affected_party": "BUYER",
+      "amount": {
+        "currency_code": "USD",
+        "value": "300.00"
+      },
+      "initiated_time": "2026-10-31T18:31:24.502Z",
+      "type": "CREDIT",
+      "reason": "DISPUTE_SETTLEMENT"
+    },
+    {
+      "affected_party": "SELLER",
+      "amount": {
+        "currency_code": "USD",
+        "value": "300.00"
+      },
+      "initiated_time": "2026-10-31T18:31:24.502Z",
+      "type": "DEBIT",
+      "reason": "DISPUTE_SETTLEMENT"
+    }
+  ],
+  "fund_movements": [
+    {
+      "party": "RECEIVER",
+      "amount": {
+        "currency_code": "USD",
+        "value": "400.00"
+      },
+      "initiated_time": "2026-10-31T18:29:04.000Z",
+      "type": "DEBIT",
+      "reason": "HOLD_PLACED"
+    },
+    {
+      "party": "BUYER",
+      "amount": {
+        "currency_code": "USD",
+        "value": "300.00"
+      },
+      "initiated_time": "2026-10-31T18:31:24.502Z",
+      "type": "CREDIT",
+      "reason": "DISPUTE_SETTLEMENT"
+    },
+    {
+      "party": "SELLER",
+      "amount": {
+        "currency_code": "USD",
+        "value": "300.00"
+      },
+      "initiated_time": "2026-10-31T18:31:24.502Z",
+      "type": "DEBIT",
+      "reason": "DISPUTE_SETTLEMENT"
+    }
+  ],
+  "dispute_life_cycle_stage": "INQUIRY",
+  "dispute_channel": "INTERNAL",
+  "messages": [
+    {
+      "posted_by": "BUYER",
+      "time_posted": "2026-10-31T18:25:35.592Z",
+      "content": "SANDBOX TEST (synthetic case, CT3110-MIRB1). Paid $600 up front for 6 promised items (quote attached). Items 1-2 were done. Items 3-6 were never done and the contractor stopped replying: 3 exhaust fan (photo attached: ceiling cut-out still open), 4 shower wall tile, 5 vanity and faucet, 6 paint and trim. I am claiming only the 4 unfinished items, $100 each = $400.",
+      "documents": [
+        {
+          "name": "item3-fan-not-installed.png",
+          "url": "https://api-m.sandbox.paypal.com/v2/content/documents/DIS-010-11f1-d558-76837100-bfd9-32949d17d548/files/1/download"
+        },
+        {
+          "name": "quote-6-items.pdf",
+          "url": "https://api-m.sandbox.paypal.com/v2/content/documents/DIS-010-11f1-d558-76843450-bda7-c329f462b648/files/1/download"
+        }
+      ]
+    },
+    {
+      "posted_by": "SELLER",
+      "time_posted": "2026-10-31T18:30:35.489Z",
+      "content": "Contractor offer (sandbox spike): refund $300.00 instead of the claimed amount."
+    }
+  ],
+  "extensions": {
+    "merchant_contacted": true,
+    "merchant_contacted_outcome": "NO_RESPONSE",
+    "buyer_contacted_time": "2026-10-31T18:25:34.720Z"
+  },
+  "evidences": [
+    {
+      "evidence_type": "CREATE",
+      "documents": [
+        {
+          "name": "item3-fan-not-installed.png",
+          "url": "https://api-m.sandbox.paypal.com/v2/content/documents/DIS-010-11f1-d558-76837100-bfd9-32949d17d548/files/1/download"
+        },
+        {
+          "name": "quote-6-items.pdf",
+          "url": "https://api-m.sandbox.paypal.com/v2/content/documents/DIS-010-11f1-d558-76843450-bda7-c329f462b648/files/1/download"
+        }
+      ],
+      "notes": "SANDBOX TEST (synthetic case, CT3110-MIRB1). Paid $600 up front for 6 promised items (quote attached). Items 1-2 were done. Items 3-6 were never done and the contractor stopped replying: 3 exhaust fan (photo attached: ceiling cut-out still open), 4 shower wall tile, 5 vanity and faucet, 6 paint and trim. I am claiming only the 4 unfinished items, $100 each = $400.",
+      "source": "SUBMITTED_BY_BUYER",
+      "date": "2026-10-31T18:25:35.592Z",
+      "dispute_life_cycle_stage": "INQUIRY"
+    }
+  ],
+  "offer": {
+    "buyer_requested_amount": {
+      "currency_code": "USD",
+      "value": "300.00"
+    },
+    "seller_offered_amount": {
+      "currency_code": "USD",
+      "value": "300.00"
+    },
+    "offer_type": "REFUND",
+    "history": [
+      {
+        "offer_time": "2026-10-31T18:30:35.489Z",
+        "actor": "SELLER",
+        "event_type": "PROPOSED",
+        "offer_type": "REFUND",
+        "offer_amount": {
+          "currency_code": "USD",
+          "value": "300.00"
+        }
+      },
+      {
+        "offer_time": "2026-10-31T18:31:24.598Z",
+        "actor": "BUYER",
+        "event_type": "ACCEPTED"
+      }
+    ]
+  },
+  "refund_details": {
+    "allowed_refund_amount": {
+      "currency_code": "USD",
+      "value": "300.00"
+    },
+    "transactions": [
+      {
+        "id": "2B939406H8694444C",
+        "gross_amount": {
+          "currency_code": "USD",
+          "value": "300.00"
+        },
+        "create_time": "2026-10-31T18:31:24.000Z"
+      }
+    ]
+  },
+  "links": [
+    {
+      "href": "https://api-m.sandbox.paypal.com/v1/customer/disputes/PP-R-HAX-10195521",
+      "rel": "self",
+      "method": "GET"
+    }
+  ]
+}

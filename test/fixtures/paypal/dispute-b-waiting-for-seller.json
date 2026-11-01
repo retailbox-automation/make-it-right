@@ -1,0 +1,176 @@
+{
+  "dispute_id": "PP-R-GWA-10195522",
+  "create_time": "2026-10-31T18:29:56.922Z",
+  "update_time": "2026-10-31T18:33:23.732Z",
+  "disputed_transactions": [
+    {
+      "buyer_transaction_id": "36H69778E4891824M",
+      "seller_transaction_id": "08682011KF7334723",
+      "create_time": "2026-10-31T18:27:21.000Z",
+      "transaction_status": "HELD",
+      "gross_amount": {
+        "currency_code": "USD",
+        "value": "600.00"
+      },
+      "invoice_number": "MIR-B1-B-1793471191",
+      "custom": "MIR-B1-B",
+      "buyer": {
+        "payer_id": "CGNMVM83WH4LU",
+        "name": "John Doe"
+      },
+      "seller": {
+        "merchant_id": "6QXSQHL32L686",
+        "name": "Test Store"
+      },
+      "items": [
+        {
+          "item_name": "Install bathroom exhaust fan",
+          "item_description": "Install bathroom exhaust fan",
+          "item_quantity": "1",
+          "reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
+          "item_type": "SERVICE"
+        },
+        {
+          "item_name": "Tile shower walls",
+          "item_description": "Tile shower walls",
+          "item_quantity": "1",
+          "reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
+          "item_type": "SERVICE"
+        },
+        {
+          "item_name": "Install vanity and faucet",
+          "item_description": "Install vanity and faucet",
+          "item_quantity": "1",
+          "reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
+          "item_type": "SERVICE"
+        },
+        {
+          "item_name": "Paint walls and trim",
+          "item_description": "Paint walls and trim",
+          "item_quantity": "1",
+          "reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
+          "item_type": "SERVICE"
+        }
+      ],
+      "seller_protection_eligible": true,
+      "seller_protection_type": "EXPANDED_SELLER_PROTECTION"
+    }
+  ],
+  "reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
+  "status": "WAITING_FOR_SELLER_RESPONSE",
+  "dispute_amount": {
+    "currency_code": "USD",
+    "value": "400.00"
+  },
+  "dispute_state": "REQUIRED_ACTION",
+  "fund_movements": [
+    {
+      "party": "RECEIVER",
+      "amount": {
+        "currency_code": "USD",
+        "value": "400.00"
+      },
+      "initiated_time": "2026-10-31T18:33:04.000Z",
+      "type": "DEBIT",
+      "reason": "HOLD_PLACED"
+    }
+  ],
+  "dispute_life_cycle_stage": "INQUIRY",
+  "dispute_channel": "INTERNAL",
+  "messages": [
+    {
+      "posted_by": "BUYER",
+      "time_posted": "2026-10-31T18:29:56.922Z",
+      "content": "SANDBOX TEST (synthetic case B, CT3110-MIRB1). Paid $600 up front for 6 promised items. Items 1-2 done, items 3-6 never done, contractor stopped replying. Claiming only the 4 unfinished items, $100 each = $400.",
+      "documents": [
+        {
+          "name": "item3-fan-not-installed.png",
+          "url": "https://api-m.sandbox.paypal.com/v2/content/documents/DIS-010-11f1-d559-12458e70-ac58-c9708d6937b4/files/1/download"
+        }
+      ]
+    }
+  ],
+  "extensions": {
+    "merchant_contacted": true,
+    "merchant_contacted_outcome": "NO_RESPONSE",
+    "buyer_contacted_time": "2026-10-31T18:29:56.039Z"
+  },
+  "evidences": [
+    {
+      "evidence_type": "CREATE",
+      "documents": [
+        {
+          "name": "item3-fan-not-installed.png",
+          "url": "https://api-m.sandbox.paypal.com/v2/content/documents/DIS-010-11f1-d559-12458e70-ac58-c9708d6937b4/files/1/download"
+        }
+      ],
+      "notes": "SANDBOX TEST (synthetic case B, CT3110-MIRB1). Paid $600 up front for 6 promised items. Items 1-2 done, items 3-6 never done, contractor stopped replying. Claiming only the 4 unfinished items, $100 each = $400.",
+      "source": "SUBMITTED_BY_BUYER",
+      "date": "2026-10-31T18:29:56.922Z",
+      "dispute_life_cycle_stage": "INQUIRY"
+    },
+    {
+      "evidence_type": "PROOF_OF_FULFILLMENT",
+      "source": "REQUESTED_FROM_SELLER",
+      "date": "2026-10-31T18:33:23.732Z"
+    }
+  ],
+  "seller_response_due_date": "2026-11-20T18:29:56.922Z",
+  "offer": {
+    "buyer_requested_amount": {
+      "currency_code": "USD",
+      "value": "400.00"
+    }
+  },
+  "refund_details": {
+    "allowed_refund_amount": {
+      "currency_code": "USD",
+      "value": "400.00"
+    }
+  },
+  "allowed_response_options": {
+    "accept_claim": {
+      "accept_claim_types": [
+        "PARTIAL_REFUND",
+        "REFUND"
+      ]
+    },
+    "make_offer": {
+      "offer_types": [
+        "REFUND"
+      ]
+    }
+  },
+  "links": [
+    {
+      "href": "https://api-m.sandbox.paypal.com/v1/customer/disputes/PP-R-GWA-10195522",
+      "rel": "self",
+      "method": "GET"
+    },
+    {
+      "href": "https://api-m.sandbox.paypal.com/v1/customer/disputes/PP-R-GWA-10195522/accept-claim",
+      "rel": "accept_claim",
+      "method": "POST"
+    },
+    {
+      "href": "https://api-m.sandbox.paypal.com/v1/customer/disputes/PP-R-GWA-10195522/make-offer",
+      "rel": "make_offer",
+      "method": "POST"
+    },
+    {
+      "href": "https://api-m.sandbox.paypal.com/v1/customer/disputes/PP-R-GWA-10195522/provide-evidence",
+      "rel": "provide_evidence",
+      "method": "POST"
+    },
+    {
+      "href": "https://api-m.sandbox.paypal.com/v1/customer/disputes/PP-R-GWA-10195522/send-message",
+      "rel": "send_message",
+      "method": "POST"
+    },
+    {
+      "href": "https://api-m.sandbox.paypal.com/v1/customer/disputes/PP-R-GWA-10195522/escalate",
+      "rel": "escalate",
+      "method": "POST"
+    }
+  ]
+}

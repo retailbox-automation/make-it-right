@@ -1,0 +1,201 @@
+{
+  "dispute_id": "PP-R-XJB-10195596",
+  "create_time": "2026-10-31T19:25:32.865Z",
+  "update_time": "2026-10-31T19:53:33.570Z",
+  "disputed_transactions": [
+    {
+      "buyer_transaction_id": "3N732607MB758071P",
+      "seller_transaction_id": "1KM933510K488100A",
+      "create_time": "2026-10-31T19:22:53.000Z",
+      "transaction_status": "PARTIALLY_REFUNDED",
+      "gross_amount": {
+        "currency_code": "USD",
+        "value": "600.00"
+      },
+      "invoice_number": "MIR-B1-C-1793474510",
+      "custom": "MIR-B1-C",
+      "buyer": {
+        "payer_id": "CGNMVM83WH4LU",
+        "name": "John Doe"
+      },
+      "seller": {
+        "merchant_id": "6QXSQHL32L686",
+        "name": "Test Store"
+      },
+      "items": [
+        {
+          "item_name": "Install bathroom exhaust fan",
+          "item_description": "Install bathroom exhaust fan",
+          "item_quantity": "1",
+          "reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
+          "item_type": "SERVICE"
+        },
+        {
+          "item_name": "Tile shower walls",
+          "item_description": "Tile shower walls",
+          "item_quantity": "1",
+          "reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
+          "item_type": "SERVICE"
+        },
+        {
+          "item_name": "Install vanity and faucet",
+          "item_description": "Install vanity and faucet",
+          "item_quantity": "1",
+          "reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
+          "item_type": "SERVICE"
+        },
+        {
+          "item_name": "Paint walls and trim",
+          "item_description": "Paint walls and trim",
+          "item_quantity": "1",
+          "reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
+          "item_type": "SERVICE"
+        }
+      ],
+      "seller_protection_eligible": true,
+      "seller_protection_type": "EXPANDED_SELLER_PROTECTION"
+    }
+  ],
+  "reason": "MERCHANDISE_OR_SERVICE_NOT_RECEIVED",
+  "status": "RESOLVED",
+  "dispute_amount": {
+    "currency_code": "USD",
+    "value": "400.00"
+  },
+  "dispute_state": "RESOLVED",
+  "dispute_outcome": {
+    "outcome_code": "RESOLVED_BUYER_FAVOUR",
+    "outcome_reason": "SELLER_ISSUED_REFUND",
+    "amount_refunded": {
+      "currency_code": "USD",
+      "value": "400.00"
+    }
+  },
+  "money_movements": [
+    {
+      "affected_party": "SELLER",
+      "amount": {
+        "currency_code": "USD",
+        "value": "400.00"
+      },
+      "initiated_time": "2026-10-31T19:51:45.210Z",
+      "type": "DEBIT",
+      "reason": "DISPUTE_SETTLEMENT"
+    },
+    {
+      "affected_party": "SELLER",
+      "amount": {
+        "currency_code": "USD",
+        "value": "21.43"
+      },
+      "initiated_time": "2026-10-31T19:51:45.210Z",
+      "type": "DEBIT",
+      "reason": "DISPUTE_SETTLEMENT_FEE"
+    },
+    {
+      "affected_party": "BUYER",
+      "amount": {
+        "currency_code": "USD",
+        "value": "400.00"
+      },
+      "initiated_time": "2026-10-31T19:51:45.210Z",
+      "type": "CREDIT",
+      "reason": "DISPUTE_SETTLEMENT"
+    }
+  ],
+  "fund_movements": [
+    {
+      "party": "RECEIVER",
+      "amount": {
+        "currency_code": "USD",
+        "value": "400.00"
+      },
+      "initiated_time": "2026-10-31T19:28:34.000Z",
+      "type": "DEBIT",
+      "reason": "HOLD_PLACED"
+    },
+    {
+      "party": "SELLER",
+      "amount": {
+        "currency_code": "USD",
+        "value": "400.00"
+      },
+      "initiated_time": "2026-10-31T19:51:45.210Z",
+      "type": "DEBIT",
+      "reason": "DISPUTE_SETTLEMENT"
+    },
+    {
+      "party": "BUYER",
+      "amount": {
+        "currency_code": "USD",
+        "value": "400.00"
+      },
+      "initiated_time": "2026-10-31T19:51:45.210Z",
+      "type": "CREDIT",
+      "reason": "DISPUTE_SETTLEMENT"
+    }
+  ],
+  "dispute_life_cycle_stage": "CHARGEBACK",
+  "dispute_channel": "INTERNAL",
+  "messages": [
+    {
+      "posted_by": "BUYER",
+      "time_posted": "2026-10-31T19:25:32.865Z",
+      "content": "SANDBOX TEST (synthetic case C, CT3110-MIRB1). Paid $600 up front for 6 promised items. Items 1-2 done, items 3-6 never done, contractor stopped replying. Claiming only the 4 unfinished items, $100 each = $400."
+    }
+  ],
+  "extensions": {
+    "merchant_contacted": true,
+    "merchant_contacted_outcome": "NO_RESPONSE",
+    "buyer_contacted_time": "2026-10-31T19:25:31.898Z"
+  },
+  "evidences": [
+    {
+      "evidence_type": "CREATE",
+      "notes": "SANDBOX TEST (synthetic case C, CT3110-MIRB1). Paid $600 up front for 6 promised items. Items 1-2 done, items 3-6 never done, contractor stopped replying. Claiming only the 4 unfinished items, $100 each = $400.",
+      "source": "SUBMITTED_BY_BUYER",
+      "date": "2026-10-31T19:25:32.865Z",
+      "dispute_life_cycle_stage": "INQUIRY"
+    },
+    {
+      "evidence_type": "OTHER",
+      "notes": "Contractor accepts the claim (sandbox spike CT3110-MIRB1).",
+      "source": "SUBMITTED_BY_SELLER",
+      "date": "2026-10-31T19:51:45.310Z",
+      "action_info": {
+        "action": "ACCEPT_CLAIM",
+        "response_option": "REFUND"
+      },
+      "dispute_life_cycle_stage": "CHARGEBACK"
+    }
+  ],
+  "offer": {
+    "buyer_requested_amount": {
+      "currency_code": "USD",
+      "value": "400.00"
+    }
+  },
+  "refund_details": {
+    "allowed_refund_amount": {
+      "currency_code": "USD",
+      "value": "400.00"
+    },
+    "transactions": [
+      {
+        "id": "6MF887924W5950323",
+        "gross_amount": {
+          "currency_code": "USD",
+          "value": "400.00"
+        },
+        "create_time": "2026-10-31T19:51:45.000Z"
+      }
+    ]
+  },
+  "links": [
+    {
+      "href": "https://api-m.sandbox.paypal.com/v1/customer/disputes/PP-R-XJB-10195596",
+      "rel": "self",
+      "method": "GET"
+    }
+  ]
+}

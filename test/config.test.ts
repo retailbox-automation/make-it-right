@@ -8,7 +8,7 @@ describe('loadConfig', () => {
     expect(loadConfig(creds)).toEqual({
       port: 8787, dataDir: './data', clientId: 'id', clientSecret: 'secret',
       returnUrl: 'http://localhost:8787/paypal/return', cancelUrl: 'http://localhost:8787/paypal/cancel',
-      pollSeconds: null, journalPath: null,
+      pollSeconds: null, journalPath: null, vision: null,
     });
   });
 
@@ -48,5 +48,39 @@ describe('loadConfig', () => {
 
   it('treats an empty optional setting as not set', () => {
     expect(loadConfig({ ...creds, MIR_POLL_SECONDS: '', MIR_CALL_JOURNAL: '', MIR_DATA_DIR: '' })).toMatchObject({ pollSeconds: null, journalPath: null, dataDir: './data' });
+  });
+
+  describe('the photo-checking model', () => {
+    it('is off unless MIR_VISION_MODEL is set', () => {
+      expect(loadConfig(creds).vision).toBeNull();
+      expect(loadConfig({ ...creds, MIR_VISION_MODEL: '' }).vision).toBeNull();
+      expect(loadConfig({ ...creds, MIR_OLLAMA_URL: 'http://gpu:11434', MIR_NUM_CTX: '8192' }).vision).toBeNull();
+    });
+
+    it('takes the model name after "ollama:", with Ollama\'s usual address and an explicit context size', () => {
+      expect(loadConfig({ ...creds, MIR_VISION_MODEL: 'ollama:gemma4:31b' }).vision).toEqual({
+        provider: 'ollama', model: 'gemma4:31b', baseUrl: 'http://localhost:11434', numCtx: 16384,
+      });
+    });
+
+    it('reads the address and the context size', () => {
+      const vision = loadConfig({ ...creds, MIR_VISION_MODEL: 'ollama:qwen3-vl:8b', MIR_OLLAMA_URL: 'https://gpu.example:11434', MIR_NUM_CTX: '8192' }).vision;
+      expect(vision).toEqual({ provider: 'ollama', model: 'qwen3-vl:8b', baseUrl: 'https://gpu.example:11434', numCtx: 8192 });
+    });
+
+    it.each([
+      [{ MIR_VISION_MODEL: 'gemma4:31b' }, /MIR_VISION_MODEL/],
+      [{ MIR_VISION_MODEL: 'openai:gpt-x' }, /MIR_VISION_MODEL/],
+      [{ MIR_VISION_MODEL: 'ollama:' }, /MIR_VISION_MODEL/],
+      [{ MIR_VISION_MODEL: 'ollama:  ' }, /MIR_VISION_MODEL/],
+      [{ MIR_VISION_MODEL: 'ollama:m', MIR_NUM_CTX: 'big' }, /MIR_NUM_CTX/],
+      [{ MIR_VISION_MODEL: 'ollama:m', MIR_NUM_CTX: '100' }, /MIR_NUM_CTX/],
+      [{ MIR_VISION_MODEL: 'ollama:m', MIR_NUM_CTX: '16384.5' }, /MIR_NUM_CTX/],
+      [{ MIR_VISION_MODEL: 'ollama:m', MIR_OLLAMA_URL: 'gpu:11434' }, /MIR_OLLAMA_URL/],
+      [{ MIR_VISION_MODEL: 'ollama:m', MIR_OLLAMA_URL: 'ftp://gpu' }, /MIR_OLLAMA_URL/],
+      [{ MIR_VISION_MODEL: 'ollama:m', MIR_OLLAMA_URL: 'not a url' }, /MIR_OLLAMA_URL/],
+    ])('rejects %j', (env, message) => {
+      expect(() => loadConfig({ ...creds, ...env })).toThrow(message);
+    });
   });
 });

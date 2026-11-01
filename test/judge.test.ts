@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseTexts } from '../src/core/extract.js';
 import { combineSeen, judgeA0, judgePerPhoto, judgeTrustTexts, judgeWhole, settleVerdict, titleWords, type Photo } from '../src/core/judge.js';
 import type { PromisedItem } from '../src/model.js';
-import { ModelError } from '../src/models/vision.js';
+import { ModelError, type VisionRequest } from '../src/models/vision.js';
 import { fakeModel } from './helpers.js';
 
 const src = { kind: 'estimate' as const, ref: 'estimate p.1', date: '2026-09-08', quote: '' };
@@ -165,7 +165,7 @@ describe('lower bounds', () => {
 describe('judgeWhole with countFirst: the model lists finished units, the code counts them', () => {
   it('uses the length of units_seen for items with qty > 1 and asks for the list in the schema', async () => {
     const model = fakeModel([
-      (req) => {
+      (req: VisionRequest) => {
         const v = (req.schema as { properties: { verdicts: { items: { properties: Record<string, unknown>; required: string[] } } } }).properties.verdicts.items;
         expect(Object.keys(v.properties)).toContain('units_seen');
         expect(v.required).toContain('units_seen');
@@ -192,7 +192,7 @@ describe('judgeWhole with countFirst: the model lists finished units, the code c
 
   it('without countFirst the schema has no units_seen and done_units is the model\'s', async () => {
     const model = fakeModel([
-      (req) => {
+      (req: VisionRequest) => {
         const props = (req.schema as { properties: { verdicts: { items: { properties: Record<string, unknown> } } } }).properties.verdicts.items.properties;
         expect(Object.keys(props)).not.toContain('units_seen');
         return { verdicts: [{ item_id: '3', photo_ref: 'photo-3', note: 'x', status: 'partial', done_units: 5 }] };

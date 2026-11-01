@@ -14,7 +14,7 @@ export interface CaseInput {
 }
 
 /** whole / photo use the model; a0 (everything not done) and trust-texts (believe the contractor) are the lower bounds. */
-export type JudgeMode = 'whole' | 'photo' | 'a0' | 'trust-texts';
+export type JudgeMode = 'whole' | 'whole-count' | 'photo' | 'a0' | 'trust-texts';
 
 export interface AnalyzeOptions {
   /** With a model the items are read by the model; without one, by rules (A0). */
@@ -39,9 +39,11 @@ export async function extractItems(input: CaseInput, opts: AnalyzeOptions): Prom
 export async function judgeItems(items: PromisedItem[], input: CaseInput, opts: AnalyzeOptions): Promise<Judgement> {
   switch (opts.judgeMode) {
     case 'whole':
+    case 'whole-count':
     case 'photo': {
       if (!opts.model) throw new Error(`judge mode "${opts.judgeMode}" needs a model`);
-      return opts.judgeMode === 'whole' ? judgeWhole(opts.model, items, input.photos) : judgePerPhoto(opts.model, items, input.photos);
+      if (opts.judgeMode === 'photo') return judgePerPhoto(opts.model, items, input.photos);
+      return judgeWhole(opts.model, items, input.photos, { countFirst: opts.judgeMode === 'whole-count' });
     }
     case 'a0':
       return judgeA0(items);

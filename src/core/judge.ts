@@ -103,7 +103,7 @@ function unclear(item: PromisedItem, note: string): Verdict {
 // ---------- whole job: one call with all photos ----------
 
 // Ids and photo names are enums of this job's values: without that, a local model was seen writing "।1" for item 1.
-export function wholeSchema(items: PromisedItem[], photos: Photo[]) {
+export function wholeSchema(items: PromisedItem[], photos: Photo[], countFirst = false) {
   return {
     type: 'object',
     properties: {
@@ -115,10 +115,11 @@ export function wholeSchema(items: PromisedItem[], photos: Photo[]) {
             item_id: { type: 'string', enum: items.map((i) => i.id) },
             photo_ref: { type: 'string', enum: [...photos.map((p) => p.id), ''] },
             note: { type: 'string' },
+            ...(countFirst ? { units_seen: { type: 'array', items: { type: 'string' } } } : {}),
             status: { type: 'string', enum: [...STATUSES] },
             done_units: { type: 'integer' },
           },
-          required: ['item_id', 'photo_ref', 'note', 'status', 'done_units'],
+          required: ['item_id', 'photo_ref', 'note', ...(countFirst ? ['units_seen'] : []), 'status', 'done_units'],
         },
       },
     },
@@ -126,7 +127,7 @@ export function wholeSchema(items: PromisedItem[], photos: Photo[]) {
   };
 }
 
-export function wholePrompt(items: PromisedItem[], photos: Photo[]): string {
+export function wholePrompt(items: PromisedItem[], photos: Photo[], countFirst = false): string {
   return [
     'Punch list (promised items):',
     itemList(items),
@@ -139,20 +140,27 @@ export function wholePrompt(items: PromisedItem[], photos: Photo[]): string {
     '- item_id: the id from the punch list;',
     `- photo_ref: the photo that shows your verdict (for example "${photos[0]?.id ?? 'photo-1'}"); "" when unclear;`,
     '- note: one short sentence on what that photo shows about this item;',
+    ...(countFirst
+      ? ['- units_seen: for an item with qty > 1, list every finished unit you can see, one entry each with where it is (for example "light above the sink"); count only what is clearly finished; [] for qty 1 or when none are finished;']
+      : []),
     '- status: done, partial, not_done or unclear;',
-    '- done_units: qty for done, the counted finished units for partial, 0 for not_done and unclear.',
+    countFirst
+      ? '- done_units: for qty > 1 the number of entries in units_seen; qty for a finished qty-1 item; 0 for not_done and unclear.'
+      : '- done_units: qty for done, the counted finished units for partial, 0 for not_done and unclear.',
   ].join('\n');
 }
 
-export async function judgeWhole(model: VisionModel, items: PromisedItem[], photos: Photo[]): Promise<Judgement> {
+/** countFirst: for items with qty > 1 the model lists each finished unit it sees and the code counts the list. */
+export async function judgeWhole(model: VisionModel, items: PromisedItem[], photos: Photo[], opts: { countFirst?: boolean } = {}): Promise<Judgement> {
+  const countFirst = opts.countFirst ?? false;
   const warnings: string[] = [];
   if (!items.length) return { verdicts: [], warnings, ms: 0, calls: 0 };
   if (!photos.length) return { verdicts: items.map((i) => unclear(i, 'no photos')), warnings: ['no photos to check'], ms: 0, calls: 0 };
   const { value, ms } = await model.json<unknown>({
     system: JUDGE_SYSTEM,
-    prompt: wholePrompt(items, photos),
+    prompt: wholePrompt(items, photos, countFirst),
     images: photos.map((p) => p.image),
-    schema: wholeSchema(items, photos),
+    schema: wholeSchema(items, photos, countFirst),
     maxTokens: 4096,
   });
   const list = (value as { verdicts?: unknown } | null)?.verdicts;
@@ -171,7 +179,12 @@ export async function judgeWhole(model: VisionModel, items: PromisedItem[], phot
     }
     const ref = photoRefFrom(raw.photo_ref, photos);
     if (raw.photo_ref && !ref) warnings.push(`item ${id}: photo ${JSON.stringify(raw.photo_ref)} is not one of the photos`);
-    byId.set(id, settleVerdict(item, { status: raw.status, done_units: raw.done_units, photo_ref: ref, note: raw.note }, warnings));
+    let units = raw.done_units;
+    if (countFirst && item.qty > 1 && Array.isArray(raw.units_seen) && (raw.status === 'done' || raw.status === 'partial')) {
+      units = raw.units_seen.length; // the code counts the listed units
+      if (units !== raw.done_units) warnings.push(`item ${id}: done_units ${JSON.stringify(raw.done_units)} replaced by ${units} listed units`);
+    }
+    byId.set(id, settleVerdict(item, { status: units === item.qty && raw.status === 'partial' ? 'done' : raw.status, done_units: units, photo_ref: ref, note: raw.note }, warnings));
   }
   const verdicts = items.map((i) => {
     const v = byId.get(i.id);

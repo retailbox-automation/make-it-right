@@ -1,4 +1,4 @@
-// Eval runner: npx tsx eval/run.ts --cases <dir> --approach a0|a0-trust|a1-whole|a1-photo
+// Eval runner: npx tsx eval/run.ts --cases <dir> --approach a0|a0-trust|a1-whole|a1-photo|a1-count
 //   [--model gemma4:31b] [--num-ctx 16384] [--only c01,c02] --out <dir>
 // Per job: extraction, the judge on the extracted items (end-to-end claim), the judge on the TRUE items (verdict
 // accuracy). Writes <out>/predictions/<id>.json, <out>/metrics.json, <out>/summary.md; prints one row per job.
@@ -22,6 +22,7 @@ const APPROACHES: Record<string, { judgeMode: JudgeMode; model: boolean }> = {
   'a0-trust': { judgeMode: 'trust-texts', model: false },
   'a1-whole': { judgeMode: 'whole', model: true },
   'a1-photo': { judgeMode: 'photo', model: true },
+  'a1-count': { judgeMode: 'whole-count', model: true },
 };
 
 const MAX_LOAD = 14;

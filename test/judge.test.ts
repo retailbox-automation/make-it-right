@@ -161,3 +161,44 @@ describe('lower bounds', () => {
     expect([...titleWords('Main panel upgrade to 200A')]).toEqual(['main', 'panel', 'upgrade', '200a']);
   });
 });
+
+describe('judgeWhole with countFirst: the model lists finished units, the code counts them', () => {
+  it('uses the length of units_seen for items with qty > 1 and asks for the list in the schema', async () => {
+    const model = fakeModel([
+      (req) => {
+        const v = (req.schema as { properties: { verdicts: { items: { properties: Record<string, unknown>; required: string[] } } } }).properties.verdicts.items;
+        expect(Object.keys(v.properties)).toContain('units_seen');
+        expect(v.required).toContain('units_seen');
+        expect(req.prompt).toMatch(/units_seen/);
+        return {
+          verdicts: [
+            { item_id: '1', photo_ref: 'photo-1', note: 'four outlets', units_seen: ['a', 'b', 'c', 'd'], status: 'partial', done_units: 3 },
+            { item_id: '2', photo_ref: 'photo-2', note: 'fan', units_seen: [], status: 'done', done_units: 1 },
+            { item_id: '3', photo_ref: 'photo-3', note: 'lights', units_seen: ['over sink', 'over island', 'by door'], status: 'partial', done_units: 5 },
+            { item_id: '4', photo_ref: '', note: 'no panel photo', units_seen: [], status: 'unclear', done_units: 0 },
+          ],
+        };
+      },
+    ]);
+    const j = await judgeWhole(model, ITEMS, PHOTOS, { countFirst: true });
+    expect(j.verdicts.map((v) => [v.item_id, v.status, v.done_units])).toEqual([
+      ['1', 'done', 4],
+      ['2', 'done', 1],
+      ['3', 'partial', 3],
+      ['4', 'unclear', 0],
+    ]);
+    expect(j.warnings.join(' ')).toMatch(/item 3: done_units 5 replaced by 3 listed units/);
+  });
+
+  it('without countFirst the schema has no units_seen and done_units is the model\'s', async () => {
+    const model = fakeModel([
+      (req) => {
+        const props = (req.schema as { properties: { verdicts: { items: { properties: Record<string, unknown> } } } }).properties.verdicts.items.properties;
+        expect(Object.keys(props)).not.toContain('units_seen');
+        return { verdicts: [{ item_id: '3', photo_ref: 'photo-3', note: 'x', status: 'partial', done_units: 5 }] };
+      },
+    ]);
+    const j = await judgeWhole(model, [ITEMS[2]!], PHOTOS);
+    expect(j.verdicts[0]).toMatchObject({ status: 'partial', done_units: 5 });
+  });
+});

@@ -63,8 +63,8 @@ describe('the server', () => {
     const { case: made } = (await (await post(`${base}/api/cases`, caseBody())).json()) as { case: { id: string } };
     await post(`${base}/api/cases/${made.id}/payment`);
     const text = readFileSync(join(dir, 'paypal.calls.jsonl'), 'utf8');
-    const lines = text.trim().split('\n').map((l) => JSON.parse(l) as Record<string, unknown>);
-    expect(lines.map((l) => `${l.method} ${l.path}`)).toEqual(['POST /v1/oauth2/token', 'POST /v2/checkout/orders']);
+    const entries = text.trim().split('\n').map((l) => JSON.parse(l) as Record<string, unknown>);
+    expect(entries.map((l) => `${l.method} ${l.path}`)).toEqual(['POST /v1/oauth2/token', 'POST /v2/checkout/orders']);
     for (const secret of ['secret-value', 'tok-id', 'Bearer', 'Basic']) expect(text).not.toContain(secret);
   });
 

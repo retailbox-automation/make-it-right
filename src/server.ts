@@ -1,4 +1,5 @@
 // Entry point: reads the environment, wires the pieces together and listens.
+import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { serve } from '@hono/node-server';
 import { createApp } from './app.js';
@@ -6,10 +7,12 @@ import { loadConfig } from './config.js';
 import { Tracker, startPoller } from './disputes/tracker.js';
 import { openJournal, type Journal } from './journal.js';
 import { KeyedLock } from './lock.js';
+import { OllamaVisionModel } from './models/ollama.js';
 import { ownershipFrom } from './ownership.js';
 import { PayPalClient } from './paypal/client.js';
 import { CaseService } from './service.js';
 import { PgliteStore } from './store.js';
+import { UploadStore } from './uploads.js';
 
 export interface RunningServer {
   port: number;
@@ -19,6 +22,8 @@ export interface RunningServer {
 export interface StartDeps {
   /** Tests give a fake PayPal; the real run uses the global fetch */
   fetch?: typeof fetch;
+  /** Tests give a fake Ollama; the real run uses the global fetch */
+  modelFetch?: typeof fetch;
   log?: (message: string) => void;
 }
 
@@ -43,7 +48,12 @@ export async function start(env: Record<string, string | undefined> = process.en
     });
     const tracker = new Tracker({ store, paypal, locks, log });
     const service = new CaseService({ store, paypal, tracker, locks, urls: { returnUrl: config.returnUrl, cancelUrl: config.cancelUrl }, log });
-    const app = createApp(service, { log });
+    const vision = config.vision;
+    const model = vision
+      ? new OllamaVisionModel({ model: vision.model, baseUrl: vision.baseUrl, numCtx: vision.numCtx, ...(deps.modelFetch ? { fetch: deps.modelFetch } : {}) })
+      : undefined;
+    // The uploads are kept beside the cases, in the data directory
+    const app = createApp(service, { log, uploads: new UploadStore(join(config.dataDir, 'uploads')), ...(model ? { model } : {}) });
 
     poller = config.pollSeconds
       ? startPoller(() => tracker.tickOpenCases(), config.pollSeconds * 1000, (e) => log(`poller: ${e instanceof Error ? e.message : String(e)}`))

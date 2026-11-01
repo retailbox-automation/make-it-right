@@ -103,6 +103,7 @@ export interface Offer {
 }
 
 export interface Outcome {
+  /** money_back | denied | closed */
   status: string;
   amount_refunded: string;
   /** "the payment method you used" unless PayPal names it */
@@ -110,4 +111,35 @@ export interface Outcome {
   decided_at: string | null;
   outcome_code: string | null;
   outcome_reason: string | null;
+}
+
+/** The payment for one case: a PayPal order made from the promised items, and its capture. */
+export interface PaymentRecord {
+  order_id: string;
+  /** Where the homeowner approves the payment */
+  approve_url: string;
+  /** created = waiting for the homeowner's approval; captured = the money moved */
+  status: 'created' | 'captured';
+  /** The contractor's transaction id; the homeowner sees a different one */
+  capture_id: string | null;
+  /** ISO time of the capture */
+  captured_at: string | null;
+  method: string | null;
+}
+
+/** Everything the app keeps for one case. The claim is computed from the items and verdicts every time it is read. */
+export interface CaseRecord {
+  id: string;
+  created_at: string;
+  payee_name: string;
+  promised_items: PromisedItem[];
+  verdicts: Verdict[];
+  /** YYYY-MM-DD; filled from the capture time when it was not given */
+  paid_at: string | null;
+  payment: PaymentRecord | null;
+  /** The homeowner's own transaction id; known once PayPal lists their claim */
+  buyer_transaction_id: string | null;
+  dispute: Dispute | null;
+  offer: Offer | null;
+  outcome: Outcome | null;
 }

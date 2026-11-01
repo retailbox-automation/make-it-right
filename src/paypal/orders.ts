@@ -1,0 +1,137 @@
+// The payment: an order whose items are the promised items, so PayPal's claim form lists the same rows as our screen.
+import type { PromisedItem } from '../model.js';
+import { fromCents, toCents } from '../money.js';
+import { CUSTOM_ID_PREFIX, type PayPalClient } from './client.js';
+
+export const PAYMENT_METHOD = 'PayPal Goods & Services';
+const NAME_LIMIT = 127; // PayPal's limit for an item name and for the brand name
+
+export interface OrderInput {
+  case_id: string;
+  payee_name: string;
+  promised_items: PromisedItem[];
+  return_url: string;
+  cancel_url: string;
+}
+
+interface Money {
+  currency_code: 'USD';
+  value: string;
+}
+
+export interface OrderBody {
+  intent: 'CAPTURE';
+  purchase_units: Array<{
+    reference_id: string;
+    custom_id: string;
+    amount: Money & { breakdown: { item_total: Money } };
+    items: Array<{ name: string; quantity: string; unit_amount: Money }>;
+  }>;
+  payment_source: {
+    paypal: {
+      experience_context: {
+        user_action: 'CONTINUE';
+        shipping_preference: 'NO_SHIPPING';
+        brand_name: string;
+        return_url: string;
+        cancel_url: string;
+      };
+    };
+  };
+}
+
+export function customIdFor(caseId: string): string {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(caseId)) throw new Error(`case id "${caseId}" cannot go into a custom_id`);
+  return `${CUSTOM_ID_PREFIX}${caseId}`;
+}
+
+const usd = (cents: number): Money => ({ currency_code: 'USD', value: fromCents(cents) });
+
+/**
+ * One order item per promised item. When the price divides evenly by the quantity the item keeps its quantity
+ * (4 outlets at $65.00); otherwise it becomes one unit and the name carries the count ("Interior doors (3)").
+ */
+export function buildOrderBody(input: OrderInput): OrderBody {
+  const customId = customIdFor(input.case_id);
+  if (!input.payee_name.trim()) throw new Error('payee name is empty');
+  if (input.promised_items.length === 0) throw new Error('an order needs at least one promised item');
+
+  let total = 0;
+  const items = input.promised_items.map((promised) => {
+    const title = promised.title.trim();
+    if (!title) throw new Error(`item ${promised.id}: title is empty`);
+    if (!Number.isInteger(promised.qty) || promised.qty < 1) throw new Error(`item ${promised.id}: quantity must be a whole number, 1 or more`);
+    const price = toCents(promised.price);
+    if (price < 1) throw new Error(`item ${promised.id}: price must be more than zero`);
+    total += price;
+    const even = price % promised.qty === 0;
+    const name = even ? title : `${title} (${promised.qty})`;
+    if (name.length > NAME_LIMIT) throw new Error(`item ${promised.id}: name is longer than ${NAME_LIMIT} characters`);
+    return even
+      ? { name, quantity: String(promised.qty), unit_amount: usd(price / promised.qty) }
+      : { name, quantity: '1', unit_amount: usd(price) };
+  });
+
+  return {
+    intent: 'CAPTURE',
+    purchase_units: [
+      {
+        reference_id: customId,
+        custom_id: customId,
+        amount: { ...usd(total), breakdown: { item_total: usd(total) } },
+        items,
+      },
+    ],
+    payment_source: {
+      paypal: {
+        experience_context: {
+          user_action: 'CONTINUE',
+          shipping_preference: 'NO_SHIPPING',
+          brand_name: input.payee_name.trim().slice(0, NAME_LIMIT),
+          return_url: input.return_url,
+          cancel_url: input.cancel_url,
+        },
+      },
+    },
+  };
+}
+
+export interface CreatedOrder {
+  order_id: string;
+  status: string;
+  approve_url: string;
+}
+
+export async function createOrder(client: PayPalClient, input: OrderInput): Promise<CreatedOrder> {
+  const response = await client.request<{ id?: string; status?: string; links?: Array<{ rel: string; href: string }> }>('POST', '/v2/checkout/orders', {
+    json: buildOrderBody(input),
+    requestId: `mir-order-${input.case_id}`,
+  });
+  const approve = response.links?.find((l) => l.rel === 'payer-action' || l.rel === 'approve')?.href;
+  if (!response.id || !approve) throw new Error('PayPal created no order id or approval link');
+  return { order_id: response.id, status: response.status ?? 'CREATED', approve_url: approve };
+}
+
+export interface Capture {
+  capture_id: string;
+  status: string;
+  /** ISO time PayPal gives for the capture */
+  captured_at: string;
+  amount: string;
+  method: string;
+}
+
+export async function captureOrder(client: PayPalClient, orderId: string): Promise<Capture> {
+  const response = await client.request<{
+    purchase_units?: Array<{ payments?: { captures?: Array<{ id: string; status: string; create_time: string; amount: { value: string } }> } }>;
+  }>('POST', `/v2/checkout/orders/${orderId}/capture`, { json: {}, requestId: `mir-capture-${orderId}` });
+  const capture = response.purchase_units?.[0]?.payments?.captures?.[0];
+  if (!capture) throw new Error(`PayPal returned no capture for order ${orderId}`);
+  return {
+    capture_id: capture.id,
+    status: capture.status,
+    captured_at: capture.create_time,
+    amount: fromCents(toCents(capture.amount.value)),
+    method: PAYMENT_METHOD,
+  };
+}

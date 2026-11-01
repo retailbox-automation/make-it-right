@@ -181,7 +181,11 @@ export class PayPalClient {
 
   private record(method: string, path: string, status: number, started: number, debugId: string | null): void {
     const now = this.clock();
-    this.journal?.({ ts: new Date(now).toISOString(), method, path, status, ms: now - started, debug_id: debugId });
+    try {
+      this.journal?.({ ts: new Date(now).toISOString(), method, path, status, ms: now - started, debug_id: debugId });
+    } catch {
+      // the journal is a convenience; a failing one must not turn a PayPal call that worked into a failure
+    }
   }
 
   private async getToken(): Promise<Token> {
@@ -217,7 +221,8 @@ function guardRequest(url: URL, query: Record<string, string> | undefined, bodyT
   } catch {
     throw new RefusedRequestError('malformed path');
   }
-  if (decodedPath.toLowerCase().startsWith('/v1/notifications/webhooks')) {
+  // a server may read "/v1//notifications//webhooks" as the webhooks path, so repeated slashes count as one
+  if (decodedPath.replace(/\/{2,}/g, '/').toLowerCase().startsWith('/v1/notifications/webhooks')) {
     throw new RefusedRequestError('webhooks are shared with another project; we only poll');
   }
   const haystack = `${decodedPath} ${query ? Object.entries(query).flat().join(' ') : ''} ${bodyText}`.toLowerCase();

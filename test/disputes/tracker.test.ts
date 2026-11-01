@@ -4,17 +4,21 @@ import { Tracker, startPoller } from '../../src/disputes/tracker.js';
 import { KeyedLock } from '../../src/lock.js';
 import type { CaseRecord } from '../../src/model.js';
 import { fixture } from '../helpers/fake-paypal.js';
-import { paidCase } from '../helpers/records.js';
+import { NOW, paidCase } from '../helpers/records.js';
 import { CASE_ID, DISPUTE_ID, makeWorld, type World } from '../helpers/world.js';
 
 let world: World;
 let logged: string[];
 let tracker: Tracker;
+let clock: Date;
+const minutes = (n: number) => n * 60_000;
+const later = (ms: number) => (clock = new Date(clock.getTime() + ms));
 
 beforeEach(async () => {
   world = makeWorld();
   logged = [];
-  tracker = new Tracker({ store: world.store, paypal: world.client, locks: new KeyedLock(), log: (m) => logged.push(m) });
+  clock = NOW;
+  tracker = new Tracker({ store: world.store, paypal: world.client, locks: new KeyedLock(), now: () => clock, log: (m) => logged.push(m) });
   await world.store.put(paidCase());
 });
 
@@ -25,10 +29,18 @@ const byId = () => gets().filter((c) => c.path !== '/v1/customer/disputes');
 
 describe('finding the claim', () => {
   it('does nothing for a case that is not paid yet', async () => {
-    await world.store.put(paidCase({ payment: { order_id: 'O9', approve_url: 'x', status: 'created', capture_id: null, captured_at: null, method: null } }));
+    await world.store.put(paidCase({ payment: { order_id: 'O9', approve_url: 'x', status: 'created', capture_id: null, capture_status: null, captured_at: null, method: null } }));
     const rec = await tracker.tick(CASE_ID);
     expect(rec.dispute).toBeNull();
     expect(world.fake.calls).toHaveLength(0);
+  });
+
+  it('does nothing for a capture PayPal has not completed (nobody can dispute it yet)', async () => {
+    await world.store.put(paidCase({ payment: { order_id: 'O9', approve_url: 'x', status: 'pending', capture_id: 'CAP9', capture_status: 'PENDING', captured_at: null, method: null } }));
+    const rec = await tracker.tick(CASE_ID);
+    expect(rec.dispute).toBeNull();
+    expect(world.fake.calls).toHaveLength(0);
+    expect(await tracker.tickOpenCases()).toEqual({ checked: 0, failed: 0 });
   });
 
   it('waits when PayPal does not list a claim yet', async () => {
@@ -196,6 +208,85 @@ describe('ticking every open case', () => {
   });
 });
 
+describe('which cases the poller looks at', () => {
+  const dayMs = 86_400_000;
+  const paidDaysAgo = (id: string, days: number) => {
+    const at = new Date(NOW.getTime() - days * dayMs).toISOString();
+    return paidCase({ id, payment: { ...paidCase().payment!, captured_at: at } });
+  };
+
+  it('leaves out payments past day 180, but not day 180 itself', async () => {
+    await world.store.put(paidDaysAgo('day180', 180));
+    await world.store.put(paidDaysAgo('day181', 181));
+    await world.store.put(paidDaysAgo('old', 400));
+    const result = await tracker.tickOpenCases();
+    expect(result).toEqual({ checked: 2, failed: 0 }); // the fresh case B1-A and the one on day 180
+    expect(lists()).toHaveLength(2);
+  });
+
+  it('still looks when a person asks about an old case', async () => {
+    await world.store.put(paidDaysAgo('old', 400));
+    await tracker.tick('old');
+    expect(lists()).toHaveLength(1);
+  });
+});
+
+describe('a case that keeps failing', () => {
+  const failOne = () => {
+    world.fake.setRoute((call) => (call.path === '/v1/customer/disputes' ? { status: 500, body: { name: 'INTERNAL_SERVER_ERROR', message: 'try later' } } : undefined));
+  };
+
+  it('is tried every time for the first two failures, then left alone for 5, 10, 20 and at most 30 minutes', async () => {
+    failOne();
+    const tries = async () => (await tracker.tickOpenCases()).checked;
+    expect(await tries()).toBe(1); // failure 1
+    expect(await tries()).toBe(1); // failure 2
+    expect(await tries()).toBe(1); // failure 3: now it waits 5 minutes
+    expect(await tries()).toBe(0);
+    later(minutes(4));
+    expect(await tries()).toBe(0);
+    later(minutes(1));
+    expect(await tries()).toBe(1); // failure 4: waits 10 minutes
+    later(minutes(9));
+    expect(await tries()).toBe(0);
+    later(minutes(1));
+    expect(await tries()).toBe(1); // failure 5: waits 20 minutes
+    later(minutes(20));
+    expect(await tries()).toBe(1); // failure 6: waits 30 minutes
+    later(minutes(29));
+    expect(await tries()).toBe(0);
+    later(minutes(1));
+    expect(await tries()).toBe(1); // failure 7: still 30 minutes
+    later(minutes(29));
+    expect(await tries()).toBe(0);
+    expect(logged.some((m) => /3 failures in a row/.test(m))).toBe(true);
+  });
+
+  it('starts over after one good look', async () => {
+    failOne();
+    for (let i = 0; i < 3; i++) await tracker.tickOpenCases();
+    expect((await tracker.tickOpenCases()).checked).toBe(0);
+    later(minutes(5));
+    world.fake.setRoute(() => ({ body: { items: [] } }));
+    expect(await tracker.tickOpenCases()).toEqual({ checked: 1, failed: 0 });
+    failOne();
+    expect((await tracker.tickOpenCases()).checked).toBe(1); // counting from one again
+    expect((await tracker.tickOpenCases()).checked).toBe(1);
+    expect((await tracker.tickOpenCases()).checked).toBe(1);
+    expect((await tracker.tickOpenCases()).checked).toBe(0);
+  });
+
+  it('does not stop a person who asks about it', async () => {
+    failOne();
+    for (let i = 0; i < 3; i++) await tracker.tickOpenCases();
+    world.fake.calls.length = 0;
+    world.fake.setRoute(() => ({ body: { items: [] } }));
+    await tracker.tick(CASE_ID);
+    expect(lists()).toHaveLength(1);
+    expect((await tracker.tickOpenCases()).checked).toBe(1); // the good look cleared the wait
+  });
+});
+
 describe('poller', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
@@ -209,9 +300,29 @@ describe('poller', () => {
     expect(job).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(180_000);
     expect(job).toHaveBeenCalledTimes(3);
-    poller.stop();
+    await poller.stop();
     await vi.advanceTimersByTimeAsync(300_000);
     expect(job).toHaveBeenCalledTimes(3);
+  });
+
+  it('waits for a run that is still going when asked to stop', async () => {
+    let release!: () => void;
+    const job = vi.fn(() => new Promise<void>((resolve) => (release = resolve)));
+    const poller = startPoller(job, 1000);
+    await vi.advanceTimersByTimeAsync(1000);
+    let stopped = false;
+    const stopping = poller.stop().then(() => (stopped = true));
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(stopped).toBe(false); // the run has not finished
+    expect(job).toHaveBeenCalledTimes(1); // and no new run was started
+    release();
+    await stopping;
+    expect(stopped).toBe(true);
+  });
+
+  it('stops at once when nothing is running', async () => {
+    const poller = startPoller(async () => undefined, 1000);
+    await expect(poller.stop()).resolves.toBeUndefined();
   });
 
   it('does not start a run while the previous one is still going', async () => {
@@ -223,7 +334,8 @@ describe('poller', () => {
     release();
     await vi.advanceTimersByTimeAsync(1000);
     expect(job).toHaveBeenCalledTimes(2);
-    poller.stop();
+    release();
+    await poller.stop();
   });
 
   it('reports a failing run and keeps polling', async () => {
@@ -233,6 +345,6 @@ describe('poller', () => {
     await vi.advanceTimersByTimeAsync(3500);
     expect(n).toBe(3);
     expect(errors).toHaveLength(1);
-    poller.stop();
+    await poller.stop();
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PayPalClient, PayPalError } from '../../src/paypal/client.js';
-import { buildOrderBody, captureOrder, createOrder, customIdFor, PAYMENT_METHOD, type OrderInput } from '../../src/paypal/orders.js';
+import { buildOrderBody, captureOrder, createOrder, customIdFor, PAYMENT_METHOD, readCapture, type OrderInput } from '../../src/paypal/orders.js';
 import { fakePayPal, fixture, type Route } from '../helpers/fake-paypal.js';
 import { item, RIDGEWAY_ITEMS } from '../helpers/demo.js';
 
@@ -142,5 +142,55 @@ describe('captureOrder', () => {
   it('fails when the answer holds no capture', async () => {
     const { client } = clientFor(() => ({ status: 201, body: { id: 'O1', status: 'COMPLETED', purchase_units: [{ payments: {} }] } }), ['O1']);
     await expect(captureOrder(client, 'O1')).rejects.toThrow(/no capture/);
+  });
+});
+
+describe('capture that is not complete yet, or already taken', () => {
+  const pendingCapture = () => {
+    const body = fixture('order-captured');
+    body.purchase_units[0].payments.captures[0].status = 'PENDING';
+    return body;
+  };
+
+  it('reports a pending capture as it is, with its id', async () => {
+    const { client } = clientFor(() => ({ status: 201, body: pendingCapture() }), ['5X6481368Y377541C']);
+    expect(await captureOrder(client, '5X6481368Y377541C')).toMatchObject({ capture_id: '9UA851170T503222E', status: 'PENDING' });
+  });
+
+  it('reads the capture again by its id instead of capturing again', async () => {
+    const answer = fixture('order-captured').purchase_units[0].payments.captures[0];
+    const { fake, client } = clientFor(() => ({ body: answer }));
+    const read = await readCapture(client, '9UA851170T503222E');
+    expect(read).toEqual({ capture_id: '9UA851170T503222E', status: 'COMPLETED', captured_at: '2026-10-31T18:19:08Z', amount: '600.00', method: PAYMENT_METHOD });
+    expect(fake.calls.map((c) => `${c.method} ${c.path}`)).toEqual(['GET /v2/payments/captures/9UA851170T503222E']);
+  });
+
+  it('takes the capture from the order when PayPal says the order was already captured', async () => {
+    const { fake, client } = clientFor(
+      (call) =>
+        call.method === 'POST'
+          ? { status: 422, body: { name: 'UNPROCESSABLE_ENTITY', message: 'Already captured', details: [{ issue: 'ORDER_ALREADY_CAPTURED' }] } }
+          : { body: fixture('order-captured') },
+      ['5X6481368Y377541C'],
+    );
+    const captured = await captureOrder(client, '5X6481368Y377541C');
+    expect(captured).toMatchObject({ capture_id: '9UA851170T503222E', status: 'COMPLETED' });
+    expect(fake.calls.map((c) => `${c.method} ${c.path}`)).toEqual(['POST /v2/checkout/orders/5X6481368Y377541C/capture', 'GET /v2/checkout/orders/5X6481368Y377541C']);
+  });
+
+  it('still fails when an already captured order shows no capture', async () => {
+    const { client } = clientFor(
+      (call) =>
+        call.method === 'POST'
+          ? { status: 422, body: { name: 'UNPROCESSABLE_ENTITY', details: [{ issue: 'ORDER_ALREADY_CAPTURED' }] } }
+          : { body: { id: 'O1', status: 'COMPLETED', purchase_units: [{ payments: {} }] } },
+      ['O1'],
+    );
+    await expect(captureOrder(client, 'O1')).rejects.toThrow(/no capture/);
+  });
+
+  it('passes other refusals on', async () => {
+    const { client } = clientFor(() => ({ status: 422, body: { name: 'UNPROCESSABLE_ENTITY', details: [{ issue: 'ORDER_NOT_APPROVED' }] } }), ['O1']);
+    await expect(captureOrder(client, 'O1')).rejects.toMatchObject({ issue: 'ORDER_NOT_APPROVED' });
   });
 });

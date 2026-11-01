@@ -73,6 +73,27 @@ describe('the server', () => {
     expect(existsSync(join(dir, 'paypal.calls.jsonl'))).toBe(false);
   });
 
+  it('fails at start, before anything is opened, when the journal path is bad', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'mir-server-'));
+    dirs.push(dir);
+    await expect(
+      start(
+        { PAYPAL_SANDBOX_CLIENT_ID: 'id', PAYPAL_SANDBOX_CLIENT_SECRET: 'secret-value', PORT: '0', MIR_DATA_DIR: join(dir, 'db'), MIR_CALL_JOURNAL: join(dir, 'no-such-dir', 'calls.jsonl') },
+        { log: () => undefined },
+      ),
+    ).rejects.toThrow(/ENOENT/);
+    expect(existsSync(join(dir, 'db'))).toBe(false);
+  });
+
+  it('fails cleanly when the port is taken', async () => {
+    const first = await boot();
+    const dir = mkdtempSync(join(tmpdir(), 'mir-server-'));
+    dirs.push(dir);
+    await expect(
+      start({ PAYPAL_SANDBOX_CLIENT_ID: 'id', PAYPAL_SANDBOX_CLIENT_SECRET: 'secret-value', PORT: String(first.server.port), MIR_DATA_DIR: join(dir, 'db') }, { log: () => undefined }),
+    ).rejects.toThrow(/EADDRINUSE/);
+  });
+
   it('refuses to start without PayPal credentials', async () => {
     await expect(start({ PORT: '0' }, { log: () => undefined })).rejects.toThrow(/PAYPAL_SANDBOX_CLIENT_ID/);
   });

@@ -14,6 +14,8 @@ import { CASE_ID, DISPUTE_ID, ORDER_ID, makeWorld, type World } from './helpers/
 
 let world: World;
 let app: Hono;
+let now: Date;
+const pastTheMemory = () => (now = new Date(now.getTime() + 16_000)); // GET .../dispute answers from memory for 15 seconds
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => {
   while (cleanups.length) await cleanups.pop()!();
@@ -22,11 +24,12 @@ afterEach(async () => {
 function build(world: World, store: Store = world.store, client: PayPalClient = world.client) {
   const locks = new KeyedLock();
   const tracker = new Tracker({ store, paypal: client, locks });
-  const service = new CaseService({ store, paypal: client, tracker, locks, now: () => NOW, newId: () => CASE_ID, urls: { returnUrl: 'http://localhost:8787/r', cancelUrl: 'http://localhost:8787/c' } });
+  const service = new CaseService({ store, paypal: client, tracker, locks, now: () => now, newId: () => CASE_ID, urls: { returnUrl: 'http://localhost:8787/r', cancelUrl: 'http://localhost:8787/c' } });
   return createApp(service, { log: () => undefined });
 }
 
 beforeEach(() => {
+  now = NOW;
   world = makeWorld();
   app = build(world);
 });
@@ -68,6 +71,45 @@ describe('cases', () => {
     expect((await json(notJson)).error.message).toMatch(/JSON/);
     const empty = await app.request('/api/cases', { method: 'POST' });
     expect(empty.status).toBe(400);
+  });
+
+  describe('request size', () => {
+    const LIMIT = 256 * 1024;
+    // a valid case body padded to an exact size with a long (but legal-length) payee name would hit the string limit, so pad with spaces
+    const padded = (bytes: number) => {
+      const base = JSON.stringify(demo());
+      return base + ' '.repeat(bytes - base.length);
+    };
+
+    it('takes a body of exactly 256 KB', async () => {
+      const res = await send('/api/cases', 'POST', padded(LIMIT));
+      expect(res.status).toBe(201);
+    });
+
+    it('refuses a body of one byte more, in JSON, and creates nothing', async () => {
+      const res = await send('/api/cases', 'POST', padded(LIMIT + 1));
+      expect(res.status).toBe(413);
+      expect(await json(res)).toEqual({ error: { code: 'PAYLOAD_TOO_LARGE', message: 'the request body is larger than 256 KB' } });
+      expect(await world.store.list()).toHaveLength(0);
+    });
+
+    it('also refuses it when the sender announces the size', async () => {
+      const body = padded(LIMIT + 1);
+      const res = await app.request('/api/cases', { method: 'POST', headers: { 'content-type': 'application/json', 'content-length': String(body.length) }, body });
+      expect(res.status).toBe(413);
+    });
+
+    it('counts bytes, not characters', async () => {
+      const body = JSON.stringify({ ...demo(), note: 'é'.repeat(LIMIT / 2 + 1) });
+      expect(body.length).toBeLessThan(LIMIT + 200);
+      const res = await send('/api/cases', 'POST', body);
+      expect(res.status).toBe(413);
+    });
+
+    it('limits every route under /api, not only case creation', async () => {
+      const res = await send(`/api/sim/contractor/${CASE_ID}/evidence`, 'POST', { note: 'x'.repeat(LIMIT) });
+      expect(res.status).toBe(413);
+    });
   });
 
   it('answers unknown routes with a JSON 404', async () => {
@@ -166,6 +208,24 @@ describe('sandbox helpers over HTTP', () => {
     expect(await json(accept)).toMatchObject({ sandbox_only: true, action: 'accept-claim' });
   });
 
+  it('POST sim evidence lets the contractor answer PayPal, so PayPal can decide', async () => {
+    const res = await send(`/api/sim/contractor/${CASE_ID}/evidence`, 'POST', { note: 'Work log attached.' });
+    expect(res.status).toBe(200);
+    expect(await json(res)).toMatchObject({ sandbox_only: true, action: 'provide-evidence' });
+    expect(world.fake.calls.find((c) => c.path.endsWith('/provide-evidence'))?.body).toContain('Work log attached.');
+    const plain = await send(`/api/sim/contractor/${CASE_ID}/evidence`, 'POST');
+    expect(plain.status).toBe(200);
+    expect((await send(`/api/sim/contractor/${CASE_ID}/evidence`, 'POST', { note: 7 })).status).toBe(400);
+    expect((await send('/api/sim/contractor/nope/evidence', 'POST')).status).toBe(404);
+  });
+
+  it('POST adjudicate is 409 CONTRACTOR_MUST_ANSWER_FIRST after an escalation nobody answered', async () => {
+    world.dispute = { ...fixture('dispute-b-escalated'), dispute_id: DISPUTE_ID, disputed_transactions: fixture('dispute-a-open').disputed_transactions };
+    const res = await send(`/api/cases/${CASE_ID}/adjudicate`, 'POST', { outcome: 'BUYER_FAVOR' });
+    expect(res.status).toBe(409);
+    expect(await json(res)).toEqual({ error: { code: 'CONTRACTOR_MUST_ANSWER_FIRST', message: 'The contractor has to answer PayPal first' } });
+  });
+
   it('the helpers are 404 for an unknown case', async () => {
     for (const [path, body] of [['/escalate', undefined], ['/adjudicate', { outcome: 'BUYER_FAVOR' }]] as const) {
       expect((await send(`/api/cases/nope${path}`, 'POST', body)).status, path).toBe(404);
@@ -194,6 +254,7 @@ describe('a whole case over HTTP, on a database', () => {
 
     w.listed = true;
     w.dispute = fixture('dispute-a-open');
+    pastTheMemory();
     let state = (await call(`/api/cases/${CASE_ID}/dispute`)).body;
     expect(state.dispute).toMatchObject({ id: DISPUTE_ID, status: 'OPEN', original_claim_amount: '400.00' });
     expect((await call(`/api/cases/${CASE_ID}`)).body.filing.filing_url).toBe('https://www.sandbox.paypal.com/resolutioncenter/filing/27S431280V029084G');
@@ -208,11 +269,13 @@ describe('a whole case over HTTP, on a database', () => {
     expect(offered.body.offer).toMatchObject({ amount: '300.00', status: 'pending' });
 
     w.dispute = fixture('dispute-a-offer-accepted');
+    pastTheMemory();
     state = (await call(`/api/cases/${CASE_ID}/dispute`)).body;
     expect(state.offer.status).toBe('accepted');
     expect(state.dispute).toMatchObject({ dispute_amount: '300.00', original_claim_amount: '400.00' });
 
     w.dispute = fixture('dispute-a-resolved');
+    pastTheMemory();
     state = (await call(`/api/cases/${CASE_ID}/dispute`)).body;
     expect(state.outcome).toEqual({
       status: 'money_back', amount_refunded: '300.00', refund_destination: 'the payment method you used',

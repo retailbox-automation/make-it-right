@@ -11,16 +11,18 @@ import { CAPTURE_ID, CASE_ID, DISPUTE_ID, ORDER_ID, makeWorld, type World } from
 let world: World;
 let service: CaseService;
 let logged: string[];
+let clock: Date;
 
 beforeEach(() => {
   world = makeWorld();
   logged = [];
+  clock = NOW;
   const locks = new KeyedLock();
   const log = (m: string) => logged.push(m);
   const tracker = new Tracker({ store: world.store, paypal: world.client, locks, log });
   service = new CaseService({
     store: world.store, paypal: world.client, tracker, locks, log,
-    now: () => NOW, newId: () => CASE_ID,
+    now: () => clock, newId: () => CASE_ID,
     urls: { returnUrl: 'http://localhost:8787/paypal/return', cancelUrl: 'http://localhost:8787/paypal/cancel' },
   });
 });
@@ -134,11 +136,12 @@ describe('payment', () => {
     await service.startPayment(CASE_ID);
     const view = await service.capture(CASE_ID);
     expect(view.case.payment).toEqual({
-      order_id: ORDER_ID, approve_url: expect.any(String), status: 'captured', capture_id: CAPTURE_ID,
+      order_id: ORDER_ID, approve_url: expect.any(String), status: 'captured', capture_id: CAPTURE_ID, capture_status: 'COMPLETED',
       captured_at: '2026-10-31T18:19:08Z', method: 'PayPal Goods & Services',
     });
     expect(view.case.paid_at).toBe('2026-10-31'); // from the capture, because none was given
-    expect(view.claim).toMatchObject({ transaction_id: CAPTURE_ID, method: 'PayPal Goods & Services', paid_at: '2026-10-31', day_n: 1 });
+    // the homeowner never sees our capture id, so the claim has no transaction id until PayPal lists their claim
+    expect(view.claim).toMatchObject({ transaction_id: null, method: 'PayPal Goods & Services', paid_at: '2026-10-31', day_n: 1 });
   });
 
   it('keeps the payment date it was given', async () => {
@@ -175,14 +178,69 @@ describe('payment', () => {
     expect((await service.capture(CASE_ID)).case.payment?.status).toBe('captured');
   });
 
-  it('does not call a payment paid while PayPal has not completed it', async () => {
-    await service.createCase(demoInput());
-    await service.startPayment(CASE_ID);
-    const pending = fixture('order-captured');
-    pending.purchase_units[0].payments.captures[0].status = 'PENDING';
-    world.fake.setRoute((c) => (c.path.endsWith('/capture') ? { status: 201, body: pending } : undefined));
-    expect(await failure(service.capture(CASE_ID))).toMatchObject({ status: 409, code: 'PAYMENT_NOT_COMPLETED' });
-    expect((await service.getCase(CASE_ID)).case.payment?.status).toBe('created');
+  describe('a capture that PayPal has not completed', () => {
+    const answerWith = (status: string) => {
+      const body = fixture('order-captured');
+      body.purchase_units[0].payments.captures[0].status = status;
+      return body;
+    };
+
+    it('remembers the capture id and its status, but does not call the case paid', async () => {
+      await service.createCase(demoInput());
+      await service.startPayment(CASE_ID);
+      world.fake.setRoute((c) => (c.path.endsWith('/capture') ? { status: 201, body: answerWith('PENDING') } : undefined));
+      expect(await failure(service.capture(CASE_ID))).toMatchObject({ status: 409, code: 'PAYMENT_NOT_COMPLETED', message: expect.stringContaining('PENDING') });
+      const view = await service.getCase(CASE_ID);
+      expect(view.case.payment).toMatchObject({ status: 'pending', capture_id: CAPTURE_ID, capture_status: 'PENDING', captured_at: null, method: null });
+      expect(view.case.paid_at).toBe('2026-09-12'); // not changed by an unfinished payment
+      expect(await world.store.get(CASE_ID).then((r) => r?.payment?.status)).toBe('pending');
+    });
+
+    it('asks PayPal about that capture later instead of capturing again, and finishes when it is COMPLETED', async () => {
+      await service.createCase(demoInput({ paid_at: undefined }));
+      await service.startPayment(CASE_ID);
+      world.fake.setRoute((c) => (c.path.endsWith('/capture') ? { status: 201, body: answerWith('PENDING') } : undefined));
+      await failure(service.capture(CASE_ID));
+      world.fake.calls.length = 0;
+
+      let status = 'PENDING';
+      world.fake.setRoute((c) => (c.path === `/v2/payments/captures/${CAPTURE_ID}` ? { body: answerWith(status).purchase_units[0].payments.captures[0] } : undefined));
+      expect(await failure(service.capture(CASE_ID))).toMatchObject({ status: 409, code: 'PAYMENT_NOT_COMPLETED' });
+      status = 'COMPLETED';
+      const view = await service.capture(CASE_ID);
+      expect(view.case.payment).toMatchObject({ status: 'captured', capture_status: 'COMPLETED', captured_at: '2026-10-31T18:19:08Z', method: 'PayPal Goods & Services' });
+      expect(view.case.paid_at).toBe('2026-10-31');
+      expect(world.fake.calls.map((c) => `${c.method} ${c.path}`)).toEqual([`GET /v2/payments/captures/${CAPTURE_ID}`, `GET /v2/payments/captures/${CAPTURE_ID}`]);
+      expect(posts()).toHaveLength(0); // never captured twice
+    });
+
+    it('does not start a second payment while one is pending', async () => {
+      await service.createCase(demoInput());
+      await service.startPayment(CASE_ID);
+      world.fake.setRoute((c) => (c.path.endsWith('/capture') ? { status: 201, body: answerWith('PENDING') } : undefined));
+      await failure(service.capture(CASE_ID));
+      expect(await failure(service.startPayment(CASE_ID))).toMatchObject({ status: 409, code: 'PAYMENT_PENDING' });
+    });
+
+    it('takes a declined capture as not paid and keeps asking PayPal about it', async () => {
+      await service.createCase(demoInput());
+      await service.startPayment(CASE_ID);
+      world.fake.setRoute((c) => (c.path.endsWith('/capture') ? { status: 201, body: answerWith('DECLINED') } : undefined));
+      expect(await failure(service.capture(CASE_ID))).toMatchObject({ code: 'PAYMENT_NOT_COMPLETED', message: expect.stringContaining('DECLINED') });
+      expect((await service.getCase(CASE_ID)).case.payment).toMatchObject({ status: 'pending', capture_status: 'DECLINED' });
+    });
+
+    it('finds the capture on the order when PayPal says it was captured already (an earlier answer got lost)', async () => {
+      await service.createCase(demoInput());
+      await service.startPayment(CASE_ID);
+      world.fake.setRoute((c) => {
+        if (c.method === 'POST' && c.path.endsWith('/capture')) return { status: 422, body: { name: 'UNPROCESSABLE_ENTITY', message: 'x', details: [{ issue: 'ORDER_ALREADY_CAPTURED' }] } };
+        if (c.method === 'GET' && c.path === `/v2/checkout/orders/${ORDER_ID}`) return { body: fixture('order-captured') };
+        return undefined;
+      });
+      const view = await service.capture(CASE_ID);
+      expect(view.case.payment).toMatchObject({ status: 'captured', capture_id: CAPTURE_ID, capture_status: 'COMPLETED' });
+    });
   });
 
   it('knows nothing about a case that does not exist', async () => {
@@ -216,6 +274,7 @@ describe('reading the claim', () => {
 
   it('shows the claim, the offer and the outcome once PayPal has them, and links the filing page to the homeowner\'s transaction', async () => {
     await withClaim('dispute-a-open');
+    clock = new Date(clock.getTime() + 16_000); // past the 15 seconds the last look is remembered
     world.dispute = ours('dispute-a-offer-accepted');
     const result = await service.getDispute(CASE_ID);
     expect(result.dispute).toMatchObject({ id: DISPUTE_ID, dispute_amount: '300.00', original_claim_amount: '400.00' });
@@ -249,6 +308,7 @@ describe('sandbox helpers: escalate and ask PayPal to decide', () => {
     expect(await failure(service.adjudicate(CASE_ID, 'BUYER_FAVOR'))).toMatchObject({ status: 409, code: 'NO_CLAIM_YET' });
     expect(await failure(service.contractorOffer(CASE_ID, { amount: '1.00' }))).toMatchObject({ status: 409, code: 'NO_CLAIM_YET' });
     expect(await failure(service.contractorAcceptClaim(CASE_ID))).toMatchObject({ status: 409, code: 'NO_CLAIM_YET' });
+    expect(await failure(service.contractorEvidence(CASE_ID, {}))).toMatchObject({ status: 409, code: 'NO_CLAIM_YET' });
     expect(posts()).toHaveLength(2); // only the order and its capture
   });
 
@@ -281,6 +341,50 @@ describe('sandbox helpers: escalate and ask PayPal to decide', () => {
     world.postAnswer = () => ({ status: 400, body: fixture('error-adjudicate-not-allowed') });
     const err = await failure(service.adjudicate(CASE_ID, 'BUYER_FAVOR'));
     expect(err).toMatchObject({ status: 409, code: 'ACTION_NOT_ALLOWED_IN_CURRENT_DISPUTE_STATE', message: 'PayPal opens this step after a review delay' });
+  });
+
+  it('will not ask PayPal to decide while the contractor has not answered the chargeback', async () => {
+    await withClaim('dispute-b-escalated');
+    const err = await failure(service.adjudicate(CASE_ID, 'BUYER_FAVOR'));
+    expect(err).toMatchObject({ status: 409, code: 'CONTRACTOR_MUST_ANSWER_FIRST', message: 'The contractor has to answer PayPal first' });
+    expect(posts()).toHaveLength(0);
+  });
+
+  it('keeps the review-delay answer for a case PayPal is already reviewing', async () => {
+    await withClaim('dispute-b-under-review');
+    world.postAnswer = () => ({ status: 400, body: fixture('error-adjudicate-not-allowed') });
+    expect(await failure(service.adjudicate(CASE_ID, 'BUYER_FAVOR'))).toMatchObject({
+      status: 409, code: 'ACTION_NOT_ALLOWED_IN_CURRENT_DISPUTE_STATE', message: 'PayPal opens this step after a review delay',
+    });
+    expect(posts()).toHaveLength(1);
+  });
+
+  it('lets PayPal decide once the contractor has answered: escalate, contractor evidence, then the decision', async () => {
+    await withClaim();
+    world.postAnswer = () => {
+      world.dispute = ours('dispute-b-escalated');
+      return undefined;
+    };
+    await service.escalate(CASE_ID);
+    expect(await failure(service.adjudicate(CASE_ID, 'BUYER_FAVOR'))).toMatchObject({ code: 'CONTRACTOR_MUST_ANSWER_FIRST' });
+
+    world.postAnswer = () => {
+      world.dispute = ours('dispute-b-under-review');
+      return undefined;
+    };
+    const evidence = await service.contractorEvidence(CASE_ID, { note: 'Work log and photos of the finished items.' });
+    expect(evidence).toMatchObject({ sandbox_only: true, action: 'provide-evidence', dispute: { status: 'UNDER_REVIEW', life_cycle_stage: 'CHARGEBACK' } });
+
+    world.postAnswer = () => ({ status: 400, body: fixture('error-adjudicate-not-allowed') });
+    expect(await failure(service.adjudicate(CASE_ID, 'BUYER_FAVOR'))).toMatchObject({ message: 'PayPal opens this step after a review delay' });
+
+    world.dispute = ours('dispute-b-adjudicatable'); // PayPal opened the step
+    world.postAnswer = () => {
+      world.dispute = ours('dispute-b-resolved');
+      return undefined;
+    };
+    const decided = await service.adjudicate(CASE_ID, 'BUYER_FAVOR');
+    expect(decided).toMatchObject({ sandbox_only: true, dispute: { status: 'RESOLVED' }, outcome: { status: 'money_back', amount_refunded: '400.00' } });
   });
 
   it('refuses an outcome that is neither side', async () => {
@@ -320,6 +424,41 @@ describe('sandbox contractor', () => {
     expect(posts()).toHaveLength(1);
   });
 
+  it('uses the amount in its normal form for the PayPal call, the note and the answer', async () => {
+    await withClaim();
+    const result = await service.contractorOffer(CASE_ID, { amount: '300.5' });
+    expect(result.amount).toBe('300.50');
+    const sent = JSON.parse(posts()[0]!.body);
+    expect(sent.offer_amount.value).toBe('300.50');
+    expect(sent.note).toContain('$300.50');
+    expect(sent.note).not.toContain('$300.5 ');
+  });
+
+  it('refuses an offer amount with too many digits', async () => {
+    await withClaim();
+    expect(await failure(service.contractorOffer(CASE_ID, { amount: '12345678901.00' }))).toMatchObject({ status: 400 });
+    expect(await failure(service.contractorOffer(CASE_ID, { amount: '5.001' }))).toMatchObject({ status: 400 });
+    expect(posts()).toHaveLength(0);
+  });
+
+  it('answers PayPal with evidence, with a default note or its own, sandbox only', async () => {
+    await withClaim();
+    const plain = await service.contractorEvidence(CASE_ID, {});
+    expect(plain).toMatchObject({ sandbox_only: true, action: 'provide-evidence', dispute: { id: DISPUTE_ID } });
+    expect(posts()[0]!.path).toBe(`/v1/customer/disputes/${DISPUTE_ID}/provide-evidence`);
+    expect(posts()[0]!.body).toContain('"evidence_type":"OTHER"');
+    await service.contractorEvidence(CASE_ID, { note: 'Signed work log for the panel upgrade.' });
+    expect(posts()[1]!.body).toContain('Signed work log for the panel upgrade.');
+  });
+
+  it('refuses an evidence note that is not text, empty, or longer than 500 characters', async () => {
+    await withClaim();
+    for (const note of [5, '', '   ', 'x'.repeat(501)]) {
+      expect(await failure(service.contractorEvidence(CASE_ID, { note: note as never })), String(note)).toMatchObject({ status: 400, code: 'INVALID_INPUT' });
+    }
+    expect(posts()).toHaveLength(0);
+  });
+
   it('accepts the claim', async () => {
     await withClaim();
     const result = await service.contractorAcceptClaim(CASE_ID);
@@ -336,5 +475,64 @@ describe('sandbox contractor', () => {
     const result = await service.contractorAcceptClaim(CASE_ID);
     expect(result).toMatchObject({ sandbox_only: true, action: 'accept-claim', dispute: { id: DISPUTE_ID } });
     expect(logged.join('\n')).toMatch(/refresh after accept-claim failed/);
+  });
+});
+
+describe('asking about the claim again and again', () => {
+  const lists = () => world.disputeCalls().filter((c) => c.method === 'GET' && c.path === '/v1/customer/disputes');
+  const byId = () => world.disputeCalls().filter((c) => c.method === 'GET' && c.path !== '/v1/customer/disputes');
+
+  it('answers from memory for 15 seconds, then looks at PayPal again', async () => {
+    await withClaim('dispute-a-open');
+    const first = await service.getDispute(CASE_ID);
+    clock = new Date(clock.getTime() + 14_000);
+    world.dispute = ours('dispute-a-offer-pending');
+    const second = await service.getDispute(CASE_ID);
+    expect(second).toEqual(first);
+    expect(byId()).toHaveLength(0);
+    clock = new Date(clock.getTime() + 2_000);
+    expect((await service.getDispute(CASE_ID)).offer).toMatchObject({ status: 'pending' });
+    expect(byId()).toHaveLength(1);
+  });
+
+  it('shows what an action just did, without waiting for the 15 seconds', async () => {
+    await withClaim('dispute-a-waiting-for-seller');
+    await service.getDispute(CASE_ID);
+    world.postAnswer = () => {
+      world.dispute = ours('dispute-a-offer-pending');
+      return undefined;
+    };
+    await service.contractorOffer(CASE_ID, { amount: '300.00' });
+    world.fake.calls.length = 0;
+    expect((await service.getDispute(CASE_ID)).offer).toMatchObject({ amount: '300.00', status: 'pending' });
+    expect(world.fake.calls).toHaveLength(0);
+  });
+
+  it('forgets the memory when the payment changes', async () => {
+    await service.createCase(demoInput());
+    expect(await service.getDispute(CASE_ID)).toEqual({ dispute: null, offer: null, outcome: null }); // not paid: remembered as empty
+    await service.startPayment(CASE_ID);
+    await service.capture(CASE_ID);
+    world.fake.calls.length = 0;
+    world.listed = true;
+    world.dispute = fixture('dispute-a-open');
+    expect((await service.getDispute(CASE_ID)).dispute).toMatchObject({ id: DISPUTE_ID });
+    expect(lists()).toHaveLength(1);
+  });
+
+  it('does not remember a failure', async () => {
+    await service.createCase(demoInput());
+    await service.startPayment(CASE_ID);
+    await service.capture(CASE_ID);
+    world.fake.setRoute(() => ({ status: 503, body: { name: 'SERVICE_UNAVAILABLE' } }));
+    expect(await failure(service.getDispute(CASE_ID))).toMatchObject({ status: 502 });
+    world.fake.setRoute(() => ({ body: { items: [] } }));
+    expect(await service.getDispute(CASE_ID)).toEqual({ dispute: null, offer: null, outcome: null });
+  });
+
+  it('keeps one memory per case', async () => {
+    await withClaim('dispute-a-open');
+    await service.getDispute(CASE_ID);
+    expect(await failure(service.getDispute('other'))).toMatchObject({ status: 404 });
   });
 });

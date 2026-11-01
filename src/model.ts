@@ -118,11 +118,13 @@ export interface PaymentRecord {
   order_id: string;
   /** Where the homeowner approves the payment */
   approve_url: string;
-  /** created = waiting for the homeowner's approval; captured = the money moved */
-  status: 'created' | 'captured';
-  /** The contractor's transaction id; the homeowner sees a different one */
+  /** created = waiting for the homeowner's approval; pending = PayPal gave a capture that is not COMPLETED yet; captured = the money moved */
+  status: 'created' | 'pending' | 'captured';
+  /** The contractor's transaction id; the homeowner sees a different one. Known as soon as PayPal returns a capture, pending or not */
   capture_id: string | null;
-  /** ISO time of the capture */
+  /** PayPal's status of that capture (COMPLETED, PENDING, ...) */
+  capture_status: string | null;
+  /** ISO time of the capture; set once it is COMPLETED */
   captured_at: string | null;
   method: string | null;
 }

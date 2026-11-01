@@ -12,7 +12,7 @@ export function paidCase(over: Partial<CaseRecord> = {}): CaseRecord {
     promised_items: RIDGEWAY_ITEMS,
     verdicts: RIDGEWAY_VERDICTS,
     paid_at: '2026-09-12',
-    payment: { order_id: ORDER_ID, approve_url: `https://www.sandbox.paypal.com/checkoutnow?token=${ORDER_ID}`, status: 'captured', capture_id: CAPTURE_ID, captured_at: '2026-10-31T18:19:08Z', method: 'PayPal Goods & Services' },
+    payment: { order_id: ORDER_ID, approve_url: `https://www.sandbox.paypal.com/checkoutnow?token=${ORDER_ID}`, status: 'captured', capture_id: CAPTURE_ID, capture_status: 'COMPLETED', captured_at: '2026-10-31T18:19:08Z', method: 'PayPal Goods & Services' },
     buyer_transaction_id: null,
     dispute: null,
     offer: null,

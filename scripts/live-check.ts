@@ -1,10 +1,10 @@
 // Read-only checks against the PayPal SANDBOX, plus one unapproved order to prove the request shape.
 // Run it through the wrapper that injects the sandbox credentials, never with them in the command line:
 //   VAULT_EGRESS_OK=api-m.sandbox.paypal.com tools/lbl/with-sandbox-env.sh npx tsx scripts/live-check.ts <command>
-// Commands: research | disputes | smoke-order
+// Commands: research | disputes | list | smoke-order
 // It prints statuses, ids and field names. It never prints credentials, tokens or e-mail addresses.
 import { PayPalClient, PayPalError, type JournalEntry } from '../src/paypal/client.js';
-import { belongsToCase, buyerTransactionId, getDispute, mapDispute, mapOffer, mapOutcome } from '../src/paypal/disputes.js';
+import { belongsToCase, buyerTransactionId, getDispute, listDisputes, mapDispute, mapOffer, mapOutcome } from '../src/paypal/disputes.js';
 import { createOrder } from '../src/paypal/orders.js';
 import { item } from '../test/helpers/demo.js';
 
@@ -68,6 +68,16 @@ async function disputes() {
   }
 }
 
+/** The tracker's own query, exactly as the code sends it: ?disputed_transaction_id=<capture id>&page_size=20 */
+async function list() {
+  const a = SPIKE[0]!;
+  const items = await attempt('GET dispute list', () => listDisputes(paypal, { disputed_transaction_id: a.capture }));
+  if (items) {
+    console.log(`GET dispute list for capture ${a.capture}: 200 items=${items.length} ids=${items.map((i) => i.dispute_id).join(',')} | item keys=${keys(items[0]).join(',')}`);
+    console.log('   expected dispute listed:', items.some((i) => i.dispute_id === a.dispute));
+  }
+}
+
 async function smokeOrder() {
   const created = await attempt('POST order', () =>
     createOrder(paypal, {
@@ -81,7 +91,7 @@ async function smokeOrder() {
   if (created) console.log(`POST order: 200 order_id=${created.order_id} status=${created.status} approve_url_host=${new URL(created.approve_url).host} (not approved, not captured)`);
 }
 
-const commands: Record<string, () => Promise<void>> = { research, disputes, 'smoke-order': smokeOrder };
+const commands: Record<string, () => Promise<void>> = { research, disputes, list, 'smoke-order': smokeOrder };
 const command = process.argv[2] ?? '';
 const run = commands[command];
 if (!run) throw new Error(`usage: live-check.ts ${Object.keys(commands).join(' | ')}`);

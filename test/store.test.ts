@@ -9,7 +9,7 @@ import { RIDGEWAY_ITEMS, RIDGEWAY_VERDICTS } from './helpers/demo.js';
 
 const record = (id: string, created_at = '2026-11-01T10:00:00.000Z'): CaseRecord => ({
   id, created_at, payee_name: 'Ridgeway Electric', promised_items: RIDGEWAY_ITEMS, verdicts: RIDGEWAY_VERDICTS, paid_at: '2026-09-12',
-  payment: { order_id: 'O1', approve_url: 'https://www.sandbox.paypal.com/checkoutnow?token=O1', status: 'created', capture_id: null, captured_at: null, method: null },
+  payment: { order_id: 'O1', approve_url: 'https://www.sandbox.paypal.com/checkoutnow?token=O1', status: 'created', capture_id: null, capture_status: null, captured_at: null, method: null },
   buyer_transaction_id: null, dispute: null, offer: null, outcome: null,
 });
 
@@ -49,6 +49,23 @@ describe.each(kinds)('%s', (_name, make) => {
     await store.put(record('a', '2026-11-01T10:00:00.000Z'));
     await store.put(record('c', '2026-11-01T12:00:00.000Z'));
     expect((await store.list()).map((c) => c.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('knows which orders and disputes are on a case, without handing out the cases', async () => {
+    const store = await make();
+    const withDispute: CaseRecord = {
+      ...record('one'),
+      dispute: { id: 'PP-R-ONE', status: 'OPEN', life_cycle_stage: 'INQUIRY', opened_at: 'x', escalated_at: null, dispute_amount: '1.00', original_claim_amount: '1.00' },
+    };
+    await store.put(withDispute);
+    await store.put({ ...record('two'), payment: null });
+    expect(await store.hasOrder('O1')).toBe(true);
+    expect(await store.hasOrder('O2')).toBe(false);
+    expect(await store.hasDispute('PP-R-ONE')).toBe(true);
+    expect(await store.hasDispute('PP-R-TWO')).toBe(false);
+    await store.put({ ...withDispute, payment: { ...withDispute.payment!, order_id: 'O2' } });
+    expect(await store.hasOrder('O1')).toBe(false);
+    expect(await store.hasOrder('O2')).toBe(true);
   });
 
   it('hands out copies: changing one does not change the store', async () => {

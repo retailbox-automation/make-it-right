@@ -1,7 +1,7 @@
 // The payment: an order whose items are the promised items, so PayPal's claim form lists the same rows as our screen.
 import type { PromisedItem } from '../model.js';
 import { fromCents, toCents } from '../money.js';
-import { CUSTOM_ID_PREFIX, type PayPalClient } from './client.js';
+import { CUSTOM_ID_PREFIX, PayPalError, type PayPalClient } from './client.js';
 
 export const PAYMENT_METHOD = 'PayPal Goods & Services';
 const NAME_LIMIT = 127; // PayPal's limit for an item name and for the brand name
@@ -114,6 +114,7 @@ export async function createOrder(client: PayPalClient, input: OrderInput): Prom
 
 export interface Capture {
   capture_id: string;
+  /** PayPal's capture status; the payment is paid only when this is COMPLETED */
   status: string;
   /** ISO time PayPal gives for the capture */
   captured_at: string;
@@ -121,17 +122,46 @@ export interface Capture {
   method: string;
 }
 
+interface RawCapture {
+  id: string;
+  status: string;
+  create_time: string;
+  amount: { value: string };
+}
+
+interface RawOrder {
+  purchase_units?: Array<{ payments?: { captures?: RawCapture[] } }>;
+}
+
+const toCapture = (raw: RawCapture): Capture => ({
+  capture_id: raw.id,
+  status: raw.status,
+  captured_at: raw.create_time,
+  amount: fromCents(toCents(raw.amount.value)),
+  method: PAYMENT_METHOD,
+});
+
+function captureOf(order: RawOrder, orderId: string): Capture {
+  const raw = order.purchase_units?.[0]?.payments?.captures?.[0];
+  if (!raw) throw new Error(`PayPal returned no capture for order ${orderId}`);
+  return toCapture(raw);
+}
+
+/**
+ * Takes the money. PayPal may answer with a capture that is not COMPLETED yet (PENDING); the caller keeps its id and asks
+ * again with readCapture. If the order was captured already (an earlier answer got lost), the capture is read from the order.
+ */
 export async function captureOrder(client: PayPalClient, orderId: string): Promise<Capture> {
-  const response = await client.request<{
-    purchase_units?: Array<{ payments?: { captures?: Array<{ id: string; status: string; create_time: string; amount: { value: string } }> } }>;
-  }>('POST', `/v2/checkout/orders/${orderId}/capture`, { json: {}, requestId: `mir-capture-${orderId}` });
-  const capture = response.purchase_units?.[0]?.payments?.captures?.[0];
-  if (!capture) throw new Error(`PayPal returned no capture for order ${orderId}`);
-  return {
-    capture_id: capture.id,
-    status: capture.status,
-    captured_at: capture.create_time,
-    amount: fromCents(toCents(capture.amount.value)),
-    method: PAYMENT_METHOD,
-  };
+  try {
+    const response = await client.request<RawOrder>('POST', `/v2/checkout/orders/${orderId}/capture`, { json: {}, requestId: `mir-capture-${orderId}` });
+    return captureOf(response, orderId);
+  } catch (error) {
+    if (!(error instanceof PayPalError) || error.issue !== 'ORDER_ALREADY_CAPTURED') throw error;
+    return captureOf(await client.request<RawOrder>('GET', `/v2/checkout/orders/${orderId}`), orderId);
+  }
+}
+
+/** The capture as it is now. Used instead of capturing again once PayPal gave us a capture id. */
+export async function readCapture(client: PayPalClient, captureId: string): Promise<Capture> {
+  return toCapture(await client.request<RawCapture>('GET', `/v2/payments/captures/${captureId}`));
 }

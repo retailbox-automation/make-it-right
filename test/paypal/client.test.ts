@@ -196,6 +196,12 @@ describe('webhooks are never touched', () => {
     ['GET', '/V1/Notifications/Webhooks'],
     ['GET', '/v1/customer/../notifications/webhooks'],
     ['GET', '/v1/notifications/%77ebhooks'],
+    ['GET', '/v1//notifications/webhooks'],
+    ['GET', '/v1/notifications//webhooks'],
+    ['GET', '/v1///notifications///webhooks-events'],
+    ['GET', '/v1/customer/%2e%2e/notifications/webhooks'],
+    ['GET', '/v1/notifications%2Fwebhooks'],
+    ['GET', '/v1/notifications\\webhooks'],
   ] as const)('%s %s is refused', async (method, path) => {
     const { fake, client } = makeClient(ok, { owns: { order: () => true, dispute: () => true } });
     await expect(client.request(method, path, method === 'POST' ? { json: {} } : {})).rejects.toBeInstanceOf(RefusedRequestError);
@@ -366,6 +372,13 @@ describe('call journal', () => {
     for (const secret of [CREDS.clientSecret, CREDS.clientId, tokenFor(CREDS.clientId), 'someone@example.com', 'CAP1']) {
       expect(text).not.toContain(secret);
     }
+  });
+
+  it('does not fail a PayPal call that worked because the journal callback throws', async () => {
+    const { fake, client } = makeClient(ok, { journal: () => { throw new Error('disk full'); }, owns: { order: () => true, dispute: () => true } });
+    expect(await client.request('GET', '/v2/payments/captures/X')).toEqual({ ok: true });
+    expect(await client.request('POST', '/v2/checkout/orders/O1/capture', { json: {} })).toEqual({ ok: true });
+    expect(fake.calls).toHaveLength(2);
   });
 
   it('also records failed calls', async () => {

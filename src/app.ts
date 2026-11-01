@@ -1,7 +1,11 @@
 // The HTTP API the screens call. JSON in, JSON out; every error is {error: {code, message}}.
 import { Hono } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 import { HttpError, invalid } from './errors.js';
 import type { CaseService } from './service.js';
+
+/** Biggest request body any /api route reads */
+export const MAX_BODY_BYTES = 256 * 1024;
 
 export interface AppOptions {
   log?: (message: string) => void;
@@ -22,6 +26,14 @@ export function createApp(service: CaseService, options: AppOptions = {}): Hono 
   const log = options.log ?? ((m: string) => console.error(m));
   const app = new Hono();
 
+  app.use(
+    '/api/*',
+    bodyLimit({
+      maxSize: MAX_BODY_BYTES,
+      onError: (c) => c.json({ error: { code: 'PAYLOAD_TOO_LARGE', message: `the request body is larger than ${MAX_BODY_BYTES / 1024} KB` } }, 413),
+    }),
+  );
+
   app.post('/api/cases', async (c) => c.json(await service.createCase(await body(c.req.raw)), 201));
   app.get('/api/cases/:id', async (c) => c.json(await service.getCase(c.req.param('id'))));
   app.post('/api/cases/:id/payment', async (c) => c.json(await service.startPayment(c.req.param('id'))));
@@ -33,6 +45,7 @@ export function createApp(service: CaseService, options: AppOptions = {}): Hono 
     return c.json(await service.adjudicate(c.req.param('id'), input?.outcome));
   });
   app.post('/api/sim/contractor/:id/offer', async (c) => c.json(await service.contractorOffer(c.req.param('id'), ((await body(c.req.raw)) ?? {}) as { amount?: unknown })));
+  app.post('/api/sim/contractor/:id/evidence', async (c) => c.json(await service.contractorEvidence(c.req.param('id'), ((await body(c.req.raw)) ?? {}) as { note?: unknown })));
   app.post('/api/sim/contractor/:id/accept-claim', async (c) => c.json(await service.contractorAcceptClaim(c.req.param('id'))));
 
   app.notFound((c) => c.json({ error: { code: 'NOT_FOUND', message: `no route ${c.req.method} ${new URL(c.req.url).pathname}` } }, 404));

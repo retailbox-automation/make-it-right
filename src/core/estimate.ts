@@ -1,9 +1,14 @@
 // Read the contractor's estimate: a PDF gives its text layer (rows rebuilt by position on the page);
 // an image (photo of a paper estimate) is kept as an image for the model. No OCR here.
+// A PDF is untrusted input, so it is read within limits: its streams are sized up before pdf.js opens it (src/core/pdf-guard.ts),
+// and pdf.js runs in a worker thread that is stopped when it reads too many pages, too much text or takes too long.
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { Worker } from 'node:worker_threads';
+import { checkPdfBudget, EstimateTooComplexError } from './pdf-guard.js';
+
+export { EstimateTooComplexError };
 
 export interface EstimateRow {
   page: number;
@@ -20,6 +25,65 @@ const STANDARD_FONTS = join(dirname(require.resolve('pdfjs-dist/package.json')),
 /** Rows on the same page closer than this (in PDF points) vertically are one row. */
 const SAME_ROW = 2;
 
+const MIB = 1024 * 1024;
+
+export interface EstimateLimits {
+  maxPages: number;
+  /** Characters of text, all pages together */
+  maxChars: number;
+  /** What all compressed streams may unpack to */
+  maxInflatedBytes: number;
+  /** Places where stream data starts */
+  maxStreams: number;
+  /** Wall-clock time for reading the PDF's text */
+  timeoutMs: number;
+}
+
+export const ESTIMATE_LIMITS: EstimateLimits = { maxPages: 20, maxChars: 50_000, maxInflatedBytes: 20 * MIB, maxStreams: 5000, timeoutMs: 10_000 };
+
+const WORKER = new URL('./pdf-text-worker.mjs', import.meta.url);
+
+interface Piece {
+  x: number;
+  y: number;
+  s: string;
+}
+
+type WorkerAnswer = { ok: true; numPages: number; pages: Piece[][] } | { ok: false; reason: 'too_complex' | 'unreadable'; message: string };
+
+/** pdf.js in a worker thread of its own; the thread is stopped when it answers, fails or runs out of time */
+function readPdfText(bytes: Uint8Array, limits: EstimateLimits): Promise<{ numPages: number; pages: Piece[][] }> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(WORKER, {
+      // the thread gets its own copy of the bytes
+      workerData: { bytes: new Uint8Array(bytes), standardFontDataUrl: STANDARD_FONTS, maxPages: limits.maxPages, maxChars: limits.maxChars },
+      resourceLimits: { maxOldGenerationSizeMb: 256, maxYoungGenerationSizeMb: 32 },
+    });
+    let done = false;
+    const finish = (settle: () => void) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      void worker.terminate();
+      settle();
+    };
+    const timer = setTimeout(
+      () => finish(() => reject(new EstimateTooComplexError(`reading it took longer than ${limits.timeoutMs / 1000} seconds`))),
+      limits.timeoutMs,
+    );
+    worker.once('message', (answer: WorkerAnswer) =>
+      finish(() => {
+        if (answer.ok) resolve(answer);
+        else reject(answer.reason === 'too_complex' ? new EstimateTooComplexError(answer.message) : new Error(answer.message));
+      }),
+    );
+    worker.once('error', (error: NodeJS.ErrnoException) =>
+      finish(() => reject(error.code === 'ERR_WORKER_OUT_OF_MEMORY' ? new EstimateTooComplexError('reading it needs more memory than is allowed') : error)),
+    );
+    worker.once('exit', () => finish(() => reject(new Error('the PDF reader stopped without an answer'))));
+  });
+}
+
 export function estimateKind(bytes: Uint8Array): 'pdf' | 'image/jpeg' | 'image/png' | null {
   if (bytes.length >= 5 && Buffer.from(bytes.subarray(0, 5)).toString('latin1') === '%PDF-') return 'pdf';
   if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
@@ -27,30 +91,20 @@ export function estimateKind(bytes: Uint8Array): 'pdf' | 'image/jpeg' | 'image/p
   return null;
 }
 
-export async function parseEstimate(bytes: Uint8Array): Promise<Estimate> {
+/** `limits` are for tests; an image is not read, so the limits do not apply to it. Too much work → EstimateTooComplexError. */
+export async function parseEstimate(bytes: Uint8Array, limits: Partial<EstimateLimits> = {}): Promise<Estimate> {
   const kind = estimateKind(bytes);
   if (kind === null) throw new Error('estimate is not a PDF, JPEG or PNG file');
   if (kind !== 'pdf') return { kind: 'image', mime: kind, image: Buffer.from(bytes) };
 
-  // pdfjs takes ownership of the buffer it is given, so pass a copy.
-  const task = getDocument({ data: new Uint8Array(bytes), useSystemFonts: false, standardFontDataUrl: STANDARD_FONTS });
-  try {
-    const doc = await task.promise;
-    const rows: EstimateRow[] = [];
-    for (let p = 1; p <= doc.numPages; p++) {
-      const page = await doc.getPage(p);
-      const content = await page.getTextContent();
-      const pieces: Array<{ x: number; y: number; s: string }> = [];
-      for (const it of content.items) {
-        if (!('str' in it) || !it.str.trim()) continue;
-        pieces.push({ x: it.transform[4] as number, y: it.transform[5] as number, s: it.str });
-      }
-      for (const text of joinRows(pieces)) rows.push({ page: p, text });
-    }
-    return { kind: 'pdf', pages: doc.numPages, rows };
-  } finally {
-    await task.destroy();
-  }
+  const all = { ...ESTIMATE_LIMITS, ...limits };
+  checkPdfBudget(bytes, all);
+  const { numPages, pages } = await readPdfText(bytes, all);
+  const rows: EstimateRow[] = [];
+  pages.forEach((pieces, index) => {
+    for (const text of joinRows(pieces)) rows.push({ page: index + 1, text });
+  });
+  return { kind: 'pdf', pages: numPages, rows };
 }
 
 export async function readEstimate(file: string): Promise<Estimate> {

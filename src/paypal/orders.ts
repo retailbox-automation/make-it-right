@@ -5,6 +5,8 @@ import { CUSTOM_ID_PREFIX, PayPalError, type PayPalClient } from './client.js';
 
 export const PAYMENT_METHOD = 'PayPal Goods & Services';
 const NAME_LIMIT = 127; // PayPal's limit for an item name and for the brand name
+/** The longest item title that still fits as a name once " (1000)" is added to it for an item whose price does not divide by its quantity */
+export const TITLE_LIMIT = NAME_LIMIT - ' (1000)'.length;
 
 export interface OrderInput {
   case_id: string;

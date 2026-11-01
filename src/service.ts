@@ -4,7 +4,7 @@ import type { Tracker } from './disputes/tracker.js';
 import { conflict, HttpError, invalid, notFound } from './errors.js';
 import { parseAmount, parseCaseInput, parseNote } from './input.js';
 import type { KeyedLock } from './lock.js';
-import type { CaseRecord, Claim, Dispute, Filing, Offer, Outcome, PaymentRecord, PromisedItem, Verdict } from './model.js';
+import type { CaseRecord, Claim, Dispute, Filing, Offer, Outcome, PaymentRecord, PromisedItem, Uploads, Verdict } from './model.js';
 import { computeClaim, toCents } from './money.js';
 import { PayPalError, RefusedRequestError, type PayPalClient } from './paypal/client.js';
 import { adjudicate, escalate, isActionNotYetAllowed } from './paypal/disputes.js';
@@ -45,6 +45,8 @@ export interface CaseView {
   dispute: Dispute | null;
   offer: Offer | null;
   outcome: Outcome | null;
+  /** The job-site photos uploaded for the photo check; absent for cases made from JSON */
+  photos?: Array<{ name: string; url: string }>;
 }
 
 export interface DisputeState {
@@ -76,6 +78,7 @@ export function caseView(record: CaseRecord, now: Date): CaseView {
     dispute: record.dispute,
     offer: record.offer,
     outcome: record.outcome,
+    ...(record.uploads ? { photos: record.uploads.photos.map((name) => ({ name, url: `/api/cases/${record.id}/photos/${name}` })) } : {}),
   };
 }
 
@@ -114,9 +117,15 @@ export class CaseService {
     this.log = deps.log ?? (() => undefined);
   }
 
-  async createCase(body: unknown): Promise<CaseView> {
+  /** An id for a case that is not stored yet, for callers that need it before the case exists (the uploads are saved under it) */
+  newCaseId(): string {
+    return this.newId();
+  }
+
+  /** `saved` is given by the photo check: the id it took from newCaseId() and the files it saved under that id */
+  async createCase(body: unknown, saved?: { id: string; uploads: Uploads }): Promise<CaseView> {
     const input = parseCaseInput(body);
-    const id = this.newId();
+    const id = saved?.id ?? this.newId();
     try {
       buildOrderBody({ case_id: id, payee_name: input.payee_name, promised_items: input.promised_items, return_url: this.deps.urls.returnUrl, cancel_url: this.deps.urls.cancelUrl });
     } catch (error) {
@@ -131,6 +140,7 @@ export class CaseService {
       dispute: null,
       offer: null,
       outcome: null,
+      ...(saved ? { uploads: saved.uploads } : {}),
     };
     await this.deps.store.put(record);
     return caseView(record, this.now());

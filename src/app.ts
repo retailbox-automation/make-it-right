@@ -1,14 +1,26 @@
-// The HTTP API the screens call. JSON in, JSON out; every error is {error: {code, message}}.
+// The HTTP API the screens call. JSON in, JSON out (photos and the estimate come back as the files they are); every error is {error: {code, message}}.
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
-import { HttpError, invalid } from './errors.js';
+import { HttpError, invalid, notFound } from './errors.js';
+import { maxBodyBytes, sizeText, UPLOAD_LIMITS, type UploadLimits } from './intake.js';
+import type { VisionModel } from './models/vision.js';
+import { analyzeUpload } from './photocheck.js';
 import type { CaseService } from './service.js';
+import { PHOTO_NAME, type StoredUpload, type UploadStore } from './uploads.js';
 
-/** Biggest request body any /api route reads */
+/** Biggest request body any /api route reads, except POST /api/cases/analyze (see maxBodyBytes in src/intake.ts) */
 export const MAX_BODY_BYTES = 256 * 1024;
+
+const ANALYZE_PATH = '/api/cases/analyze';
 
 export interface AppOptions {
   log?: (message: string) => void;
+  /** Where the uploaded estimate and photos of cases live; without it the photo and estimate routes answer 404 */
+  uploads?: UploadStore;
+  /** The model that reads the estimate and the photos; without it (or without uploads) POST /api/cases/analyze answers 503 */
+  model?: VisionModel;
+  /** Size limits of POST /api/cases/analyze; UPLOAD_LIMITS unless a test sets others */
+  uploadLimits?: UploadLimits;
 }
 
 /** The JSON body, or undefined when there is none. Present but not JSON is a 400. */
@@ -22,20 +34,41 @@ async function body(request: Request): Promise<unknown> {
   }
 }
 
+const tooLarge = (bytes: number) =>
+  ({ error: { code: 'PAYLOAD_TOO_LARGE', message: `the request body is larger than ${bytes >= 1024 * 1024 ? sizeText(bytes) : `${bytes / 1024} KB`}` } }) as const;
+
+function file(found: StoredUpload | null, what: string): Response {
+  if (!found) throw notFound(what);
+  return new Response(new Uint8Array(found.bytes), { headers: { 'content-type': found.contentType, 'content-length': String(found.bytes.length), 'x-content-type-options': 'nosniff' } });
+}
+
 export function createApp(service: CaseService, options: AppOptions = {}): Hono {
   const log = options.log ?? ((m: string) => console.error(m));
+  const { uploads, model } = options;
+  const limits = options.uploadLimits ?? UPLOAD_LIMITS;
   const app = new Hono();
 
-  app.use(
-    '/api/*',
-    bodyLimit({
-      maxSize: MAX_BODY_BYTES,
-      onError: (c) => c.json({ error: { code: 'PAYLOAD_TOO_LARGE', message: `the request body is larger than ${MAX_BODY_BYTES / 1024} KB` } }, 413),
-    }),
-  );
+  const isAnalyze = (method: string, path: string) => method === 'POST' && path === ANALYZE_PATH;
+  const small = bodyLimit({ maxSize: MAX_BODY_BYTES, onError: (c) => c.json(tooLarge(MAX_BODY_BYTES), 413) });
+  const large = bodyLimit({ maxSize: maxBodyBytes(limits), onError: (c) => c.json(tooLarge(maxBodyBytes(limits)), 413) });
 
+  // Answered before any of the body is read: a server without a model should not take 50 MB to say so
+  app.use('/api/*', async (c, next) => {
+    if (isAnalyze(c.req.method, c.req.path) && !(model && uploads)) {
+      throw new HttpError(503, 'PHOTO_CHECK_NOT_CONFIGURED', 'the photo check is not configured on this server (MIR_VISION_MODEL is not set)');
+    }
+    return next();
+  });
+  app.use('/api/*', (c, next) => (isAnalyze(c.req.method, c.req.path) ? large(c, next) : small(c, next)));
+
+  app.post(ANALYZE_PATH, async (c) => c.json(await analyzeUpload({ service, model: model!, uploads: uploads!, limits, log }, c.req.raw), 201));
   app.post('/api/cases', async (c) => c.json(await service.createCase(await body(c.req.raw)), 201));
   app.get('/api/cases/:id', async (c) => c.json(await service.getCase(c.req.param('id'))));
+  app.get('/api/cases/:id/photos/:name', async (c) => {
+    const name = c.req.param('name');
+    return file(PHOTO_NAME.test(name) ? ((await uploads?.read(c.req.param('id'), name)) ?? null) : null, 'photo');
+  });
+  app.get('/api/cases/:id/estimate', async (c) => file((await uploads?.readEstimate(c.req.param('id'))) ?? null, 'estimate'));
   app.post('/api/cases/:id/payment', async (c) => c.json(await service.startPayment(c.req.param('id'))));
   app.post('/api/cases/:id/capture', async (c) => c.json(await service.capture(c.req.param('id'))));
   app.get('/api/cases/:id/dispute', async (c) => c.json(await service.getDispute(c.req.param('id'))));

@@ -1,0 +1,21 @@
+{
+  "name": "make-it-right",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Checks a contractor's job-site photos against the promised punch list and prepares a PayPal claim for exactly the unfinished work. PayPal sandbox only.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

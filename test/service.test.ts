@@ -520,6 +520,18 @@ describe('asking about the claim again and again', () => {
     expect(lists()).toHaveLength(1);
   });
 
+  it('forgets the memory when the money is captured, not only when the order is made', async () => {
+    await service.createCase(demoInput());
+    await service.startPayment(CASE_ID);
+    expect(await service.getDispute(CASE_ID)).toEqual({ dispute: null, offer: null, outcome: null }); // approved nowhere yet: remembered as empty
+    await service.capture(CASE_ID);
+    world.fake.calls.length = 0;
+    world.listed = true;
+    world.dispute = fixture('dispute-a-open');
+    expect((await service.getDispute(CASE_ID)).dispute).toMatchObject({ id: DISPUTE_ID });
+    expect(lists()).toHaveLength(1);
+  });
+
   it('does not remember a failure', async () => {
     await service.createCase(demoInput());
     await service.startPayment(CASE_ID);

@@ -22,7 +22,7 @@ function fakeFetch(replies: Array<{ status?: number; body: string } | Error | 'h
   return { fn, calls };
 }
 
-const chat = (content: string) => ({ body: JSON.stringify({ message: { role: 'assistant', content }, done: true }) });
+const chat = (content: string) => ({ body: JSON.stringify({ message: { content }, done: true }) });
 const REQ = { system: 'sys', prompt: 'hello', schema: { type: 'object' } };
 
 describe('OllamaVisionModel', () => {

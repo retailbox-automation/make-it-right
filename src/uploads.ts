@@ -1,6 +1,6 @@
 // The files a homeowner uploaded for a case, kept on disk under <root>/<caseId>/:
 // estimate.<pdf|jpg|png> and photo-N.<jpg|png>, N = the order the photos were added in.
-import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Uploads } from './model.js';
 
@@ -26,9 +26,67 @@ export interface StoredUpload {
   contentType: string;
 }
 
+/** The uploads directory has no room for what was offered */
+export class UploadQuotaError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UploadQuotaError';
+  }
+}
+
+/** The name mkdtemp gives the scratch directory of a save: ".incoming-" and six characters */
+const SCRATCH_NAME = /^\.incoming-[A-Za-z0-9]{6}$/;
+
+export const DEFAULT_QUOTA_BYTES = 2 * 1024 * 1024 * 1024;
+
 export class UploadStore {
   /** Nothing is created until the first save */
-  constructor(private readonly root: string) {}
+  constructor(
+    private readonly root: string,
+    private readonly quotaBytes: number = DEFAULT_QUOTA_BYTES,
+  ) {}
+
+  /** Bytes in all case directories (and scratch directories) now */
+  async usedBytes(): Promise<number> {
+    let total = 0;
+    for (const entry of await this.directories()) {
+      for (const file of await readdir(join(this.root, entry), { withFileTypes: true })) {
+        if (file.isFile()) total += (await stat(join(this.root, entry, file.name))).size;
+      }
+    }
+    return total;
+  }
+
+  /** Throws UploadQuotaError when `bytes` more would go over the quota */
+  async ensureRoom(bytes: number): Promise<void> {
+    if ((await this.usedBytes()) + bytes > this.quotaBytes) throw new UploadQuotaError(`the uploads directory is limited to ${this.quotaBytes} bytes`);
+  }
+
+  /**
+   * Removes what a crashed or interrupted run left: scratch directories of saves that never finished, and case directories
+   * whose case is not known to the caller. Only directories that sit directly in the uploads directory and have a name this
+   * store writes are touched; files, links and anything else with another name are left alone.
+   */
+  async sweep(isKnownCase: (caseId: string) => Promise<boolean>): Promise<string[]> {
+    const removed: string[] = [];
+    for (const name of await this.directories()) {
+      if (SCRATCH_NAME.test(name) || (CASE_ID.test(name) && !(await isKnownCase(name)))) {
+        await rm(join(this.root, name), { recursive: true, force: true });
+        removed.push(name);
+      }
+    }
+    return removed;
+  }
+
+  /** Names of the real directories (not links) in the uploads directory */
+  private async directories(): Promise<string[]> {
+    try {
+      return (await readdir(this.root, { withFileTypes: true })).filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+      throw error;
+    }
+  }
 
   /**
    * Writes all files of a case or none: they go to a scratch directory of their own first and are renamed into place at the end.
@@ -39,6 +97,7 @@ export class UploadStore {
     const estimates = files.filter((f) => ESTIMATE_NAME.test(f.name));
     const photos = files.filter((f) => PHOTO_NAME.test(f.name));
     if (estimates.length !== 1 || estimates.length + photos.length !== files.length) throw new Error('uploads are one estimate and photos with names photo-N.<jpg|png>');
+    await this.ensureRoom(files.reduce((sum, f) => sum + f.bytes.length, 0));
 
     await mkdir(this.root, { recursive: true });
     const scratch = await mkdtemp(join(this.root, '.incoming-'));

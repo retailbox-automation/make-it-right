@@ -1,9 +1,11 @@
 // Errors the HTTP layer turns into status codes.
 export class HttpError extends Error {
   constructor(
-    readonly status: 400 | 403 | 404 | 409 | 413 | 422 | 502 | 503,
+    readonly status: 400 | 403 | 404 | 409 | 413 | 422 | 429 | 502 | 503 | 507,
     readonly code: string,
     message: string,
+    /** Sent with the answer, for example Retry-After */
+    readonly headers: Record<string, string> = {},
   ) {
     super(message);
     this.name = 'HttpError';

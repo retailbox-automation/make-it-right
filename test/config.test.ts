@@ -8,7 +8,7 @@ describe('loadConfig', () => {
     expect(loadConfig(creds)).toEqual({
       port: 8787, dataDir: './data', clientId: 'id', clientSecret: 'secret',
       returnUrl: 'http://localhost:8787/paypal/return', cancelUrl: 'http://localhost:8787/paypal/cancel',
-      pollSeconds: null, journalPath: null, vision: null,
+      pollSeconds: null, journalPath: null, vision: null, uploadQuotaBytes: 2048 * 1024 * 1024, trustForwardedFor: false,
     });
   });
 
@@ -81,6 +81,25 @@ describe('loadConfig', () => {
       [{ MIR_VISION_MODEL: 'ollama:m', MIR_OLLAMA_URL: 'not a url' }, /MIR_OLLAMA_URL/],
     ])('rejects %j', (env, message) => {
       expect(() => loadConfig({ ...creds, ...env })).toThrow(message);
+    });
+  });
+
+  describe('limits on uploads and clients', () => {
+    it('keeps 2 GB of uploads unless told otherwise, and takes the quota in megabytes', () => {
+      expect(loadConfig(creds).uploadQuotaBytes).toBe(2 * 1024 * 1024 * 1024);
+      expect(loadConfig({ ...creds, MIR_UPLOADS_QUOTA_MB: '500' }).uploadQuotaBytes).toBe(500 * 1024 * 1024);
+      expect(loadConfig({ ...creds, MIR_UPLOADS_QUOTA_MB: '' }).uploadQuotaBytes).toBe(2 * 1024 * 1024 * 1024);
+    });
+
+    it.each(['0', '-5', 'lots', '1.5'])('rejects a quota of %j', (value) => {
+      expect(() => loadConfig({ ...creds, MIR_UPLOADS_QUOTA_MB: value })).toThrow(/MIR_UPLOADS_QUOTA_MB/);
+    });
+
+    it('trusts X-Forwarded-For only when asked', () => {
+      expect(loadConfig(creds).trustForwardedFor).toBe(false);
+      expect(loadConfig({ ...creds, MIR_TRUST_FORWARDED_FOR: '1' }).trustForwardedFor).toBe(true);
+      expect(loadConfig({ ...creds, MIR_TRUST_FORWARDED_FOR: 'true' }).trustForwardedFor).toBe(true);
+      expect(loadConfig({ ...creds, MIR_TRUST_FORWARDED_FOR: '0' }).trustForwardedFor).toBe(false);
     });
   });
 });

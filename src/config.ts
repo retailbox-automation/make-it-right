@@ -12,6 +12,10 @@ export interface Config {
   journalPath: string | null;
   /** null = the photo check is not set up and POST /api/cases/analyze answers 503 */
   vision: VisionConfig | null;
+  /** The most the uploaded files of all cases may take on disk; analyses are refused beyond it */
+  uploadQuotaBytes: number;
+  /** One proxy stands in front of the server and adds the client's address to X-Forwarded-For; rate limits then count that address */
+  trustForwardedFor: boolean;
 }
 
 export interface VisionConfig {
@@ -27,6 +31,7 @@ type Env = Record<string, string | undefined>;
 
 const MIN_POLL_SECONDS = 30;
 const MIN_NUM_CTX = 1024;
+const DEFAULT_QUOTA_MB = 2048;
 const DEFAULT_OLLAMA_URL = 'http://localhost:11434';
 const DEFAULT_NUM_CTX = 16384;
 
@@ -49,6 +54,14 @@ function loadVision(env: Env): VisionConfig | null {
   }
   if (!parsed || (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')) throw new Error('MIR_OLLAMA_URL must be an http or https address, for example http://localhost:11434');
   return { provider: 'ollama', model, baseUrl, numCtx };
+}
+
+/** MIR_UPLOADS_QUOTA_MB: megabytes the uploaded files of all cases may take, 2048 unless set */
+function loadQuota(env: Env): number {
+  if (!env.MIR_UPLOADS_QUOTA_MB) return DEFAULT_QUOTA_MB;
+  const mb = Number(env.MIR_UPLOADS_QUOTA_MB);
+  if (!Number.isInteger(mb) || mb < 1) throw new Error('MIR_UPLOADS_QUOTA_MB must be a whole number of megabytes, 1 or more');
+  return mb;
 }
 
 export function loadConfig(env: Env): Config {
@@ -74,5 +87,7 @@ export function loadConfig(env: Env): Config {
     pollSeconds,
     journalPath: env.MIR_CALL_JOURNAL || null,
     vision: loadVision(env),
+    uploadQuotaBytes: loadQuota(env) * 1024 * 1024,
+    trustForwardedFor: env.MIR_TRUST_FORWARDED_FOR === '1' || env.MIR_TRUST_FORWARDED_FOR === 'true',
   };
 }

@@ -18,3 +18,4 @@ __pycache__/
 *.pyc
 .next/
 e2e-out/
+eval/out/

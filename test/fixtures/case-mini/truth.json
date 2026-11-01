@@ -1,0 +1,74 @@
+{
+ "promised_items": [
+  {
+   "id": "1",
+   "title": "New toilet installed",
+   "qty": 1,
+   "price": "450.00",
+   "source": {
+    "kind": "estimate",
+    "ref": "estimate p.1",
+    "date": "2026-08-10",
+    "quote": "New toilet installed"
+   }
+  },
+  {
+   "id": "2",
+   "title": "Interior doors",
+   "qty": 3,
+   "price": "1050.00",
+   "source": {
+    "kind": "estimate",
+    "ref": "estimate p.1",
+    "date": "2026-08-10",
+    "quote": "Interior doors"
+   }
+  },
+  {
+   "id": "3",
+   "title": "Tile bathroom floor",
+   "qty": 1,
+   "price": "700.00",
+   "source": {
+    "kind": "text",
+    "ref": "text Aug 11",
+    "date": "2026-08-11",
+    "quote": "I can also tile the floor. $700"
+   }
+  }
+ ],
+ "verdicts": [
+  {
+   "item_id": "1",
+   "status": "done",
+   "done_units": 1,
+   "photo_refs": [
+    "photo-2.png"
+   ],
+   "why": "toilet in place"
+  },
+  {
+   "item_id": "2",
+   "status": "partial",
+   "done_units": 2,
+   "photo_refs": [
+    "photo-10.png"
+   ],
+   "why": "two doors hung"
+  },
+  {
+   "item_id": "3",
+   "status": "unclear",
+   "done_units": 0,
+   "photo_refs": [],
+   "why": "no photo of this item"
+  }
+ ],
+ "claim_amount": "1050.00",
+ "proven_done": "1150.00",
+ "paid_total": "2200.00",
+ "traps": [
+  "text_adds_item",
+  "item_without_photo"
+ ]
+}

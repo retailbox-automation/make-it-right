@@ -129,6 +129,18 @@ export interface PaymentRecord {
   method: string | null;
 }
 
+/** Names of the files saved for a case (src/uploads.ts): the estimate and the job-site photos in the order they were added */
+export interface Uploads {
+  estimate: string;
+  photos: string[];
+}
+
+/** Names of the files saved for a case (src/uploads.ts): the estimate, and the job-site photos in the order they were added */
+export interface Uploads {
+  estimate: string;
+  photos: string[];
+}
+
 /** Everything the app keeps for one case. The claim is computed from the items and verdicts every time it is read. */
 export interface CaseRecord {
   id: string;
@@ -144,4 +156,6 @@ export interface CaseRecord {
   dispute: Dispute | null;
   offer: Offer | null;
   outcome: Outcome | null;
+  /** Files the homeowner uploaded for the photo check; absent for cases made from JSON */
+  uploads?: Uploads;
 }

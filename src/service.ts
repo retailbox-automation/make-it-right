@@ -101,6 +101,7 @@ function asHttp(error: unknown): unknown {
   if (error instanceof RefusedRequestError) return new HttpError(403, 'GUARD_REFUSED', error.message);
   if (error instanceof PayPalError) {
     if (error.issue === 'ORDER_NOT_APPROVED') return conflict('ORDER_NOT_APPROVED', 'The homeowner has not approved the payment on PayPal yet');
+    if (error.issue === 'INSUFFICIENT_FUNDS') return conflict('CONTRACTOR_INSUFFICIENT_FUNDS', "The contractor's PayPal balance cannot cover this refund right now");
     if (isActionNotYetAllowed(error)) return conflict('ACTION_NOT_ALLOWED_IN_CURRENT_DISPUTE_STATE', 'PayPal opens this step after a review delay');
     if (error.status === 0 || error.status >= 500) return new HttpError(502, 'PAYPAL_UNAVAILABLE', error.message);
     return new HttpError(502, 'PAYPAL_REFUSED', error.message);

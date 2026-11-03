@@ -23,7 +23,7 @@ The homeowner files on PayPal's site, so the app has no claim id. The dispute **
 2. Each listed dispute, newest first, is read with `GET /v1/customer/disputes/{id}` and kept only if `disputed_transactions[].seller_transaction_id` is our capture id or `custom` is our `MIR-<case id>`.
 3. From then on the dispute is followed by id only. A resolved dispute is not asked about again.
 
-PayPal lists a new claim minutes after it exists (empty at 18:26, listed by 18:34 in the spike), while a read by id works at once. An empty list therefore means "look again", never "no claim". Poll every 60 to 120 seconds (`MIR_POLL_SECONDS`, minimum 30; off by default). The poller leaves out payments past day 180 and resolved claims, and a case that fails three times in a row waits 5, 10, 20, then 30 minutes between tries (a good look clears it; a person asking is never held back). `stop()` waits for a tick in flight, so the database is never closed under it. `GET /api/cases/:id/dispute` answers from memory for 15 seconds per case; an action or any other look the service makes renews it, and a payment change clears it.
+PayPal lists a new claim minutes after it exists (about 3 to 4 minutes on 3 Nov 2026), while a read by id works at once. An empty list therefore means "look again", never "no claim". A claim that goes straight to `CHARGEBACK` (seen at $3,150, never at $2,690 or less) stays out of the list until something updates it, so the tracker does not see it until then; see `docs/sandbox-evidence.md`. Poll every 60 to 120 seconds (`MIR_POLL_SECONDS`, minimum 30; off by default). The poller leaves out payments past day 180 and resolved claims, and a case that fails three times in a row waits 5, 10, 20, then 30 minutes between tries (a good look clears it; a person asking is never held back). `stop()` waits for a tick in flight, so the database is never closed under it. `GET /api/cases/:id/dispute` answers from memory for 15 seconds per case; an action or any other look the service makes renews it, and a payment change clears it.
 
 ## Mapping rules (PayPal answer to our objects)
 
@@ -35,7 +35,7 @@ PayPal lists a new claim minutes after it exists (empty at 18:26, listed by 18:3
 | `outcome` | appears as soon as PayPal moves money: the buyer's `CREDIT` entries in `money_movements` (fees charged to the contractor are not counted); `dispute_outcome` adds `outcome_code` and `outcome_reason` when the dispute is resolved. `status`: `money_back` / `denied` (`RESOLVED_SELLER_FAVOUR`) / `closed` |
 | `outcome.refund_destination` | always "the payment method you used": PayPal does not name it in the dispute (the homeowner's activity shows the bank) |
 
-Observed (spike): accepted offer, contractor accepts claim, PayPal decides. **Not observed**: the event names for a declined or canceled offer, and that an open offer is canceled when the case goes to PayPal (PayPal's escalate dialog says so). Those two rules come from PayPal's docs and dialog text, not from an answer.
+Observed: accepted offer, contractor accepts claim, PayPal decides (spike and `docs/sandbox-evidence.md`), and a declined offer (`DENIED`, 3 Nov 2026). **Not observed**: the event name for a canceled offer, and that an open offer is canceled when the case goes to PayPal (PayPal's escalate dialog says so). Those two rules come from PayPal's docs and dialog text, not from an answer.
 
 ## The payment: capture states
 
@@ -43,7 +43,7 @@ PayPal can answer a capture with a status other than COMPLETED (PENDING). Whenev
 
 ## "PayPal decides" in the sandbox
 
-After an escalation PayPal opens `adjudicate` only once the contractor has answered the chargeback (spike section 5, B: evidence at 19:00:06Z, `adjudicate` link at 19:28:13Z). The path is: `POST /api/cases/:id/escalate` (or the homeowner escalates on PayPal's site), then `POST /api/sim/contractor/:id/evidence` (`{ "note"? }`), then `POST /api/cases/:id/adjudicate` once PayPal has opened it. `adjudicate` answers 409 `CONTRACTOR_MUST_ANSWER_FIRST` ("The contractor has to answer PayPal first") while the stored claim is in stage CHARGEBACK and status WAITING_FOR_SELLER_RESPONSE, and 409 `ACTION_NOT_ALLOWED_IN_CURRENT_DISPUTE_STATE` ("PayPal opens this step after a review delay") when PayPal itself refuses.
+In the spike PayPal opened `adjudicate` only once the contractor had answered the chargeback (section 5, B: evidence at 19:00:06Z, link at 19:28:13Z). On 3 Nov 2026 it was open about 2.5 minutes after the homeowner escalated, with no answer from the contractor, and on a $3,150 claim as soon as it reached `CHARGEBACK`; the cause of the difference is unknown. The path is: `POST /api/cases/:id/escalate` (or the homeowner escalates on PayPal's site), then `POST /api/sim/contractor/:id/evidence` (`{ "note"? }`), then `POST /api/cases/:id/adjudicate` once PayPal has opened it. `adjudicate` answers 409 `CONTRACTOR_MUST_ANSWER_FIRST` ("The contractor has to answer PayPal first") while the stored claim is in stage CHARGEBACK and status WAITING_FOR_SELLER_RESPONSE, and 409 `ACTION_NOT_ALLOWED_IN_CURRENT_DISPUTE_STATE` ("PayPal opens this step after a review delay") when PayPal itself refuses.
 
 ## Limits
 
@@ -51,7 +51,7 @@ Request bodies on `/api/*` are limited to 256 KB (413 `PAYLOAD_TOO_LARGE`). A ca
 
 ## Errors on the HTTP API
 
-`{ "error": { "code", "message" } }`. 400 bad input · 404 unknown case · 409 not possible yet (`NO_PAYMENT`, `ORDER_NOT_APPROVED`, `PAYMENT_NOT_COMPLETED`, `PAYMENT_PENDING`, `ALREADY_PAID`, `NO_CLAIM_YET`, `CONTRACTOR_MUST_ANSWER_FIRST`, `ACTION_NOT_ALLOWED_IN_CURRENT_DISPUTE_STATE` with "PayPal opens this step after a review delay") · 413 body over 256 KB · 403 one of our own guards refused the call · 502 PayPal unavailable or refused (its words are in the message) · 500 anything else (no detail).
+`{ "error": { "code", "message" } }`. 400 bad input · 404 unknown case · 409 not possible yet (`NO_PAYMENT`, `ORDER_NOT_APPROVED`, `PAYMENT_NOT_COMPLETED`, `PAYMENT_PENDING`, `ALREADY_PAID`, `NO_CLAIM_YET`, `CONTRACTOR_MUST_ANSWER_FIRST`, `ACTION_NOT_ALLOWED_IN_CURRENT_DISPUTE_STATE` with "PayPal opens this step after a review delay", `CONTRACTOR_INSUFFICIENT_FUNDS` when PayPal answers 422 `INSUFFICIENT_FUNDS` to a refund) · 413 body over 256 KB · 403 one of our own guards refused the call · 502 PayPal unavailable or refused (its words are in the message) · 500 anything else (no detail).
 
 PayPal's own `adjudicate` answer is 400 `ACTION_NOT_ALLOWED_IN_CURRENT_DISPUTE_STATE` until it opens the step (about 28 minutes after the contractor's response in the spike).
 
@@ -78,3 +78,7 @@ Live checks, through the wrapper that injects the secrets: `VAULT_EGRESS_OK=api-
 - `disputes`: the three spike claims read by id and run through the mapping: A resolved, offer accepted, outcome 300.00, original 400.00; B resolved, escalated at 18:33:55.518Z, outcome 400.00; C resolved, outcome 400.00, escalation time null (first seen after it was resolved).
 - `list`: the tracker's own query for capture `9UA851170T503222E` (`disputed_transaction_id` and `page_size=20`) answered 200 with one item, `PP-R-HAX-10195521`.
 - `smoke-order`: one order `MIR-B4-SMOKE-1` with three promised items, one of them an uneven split ("Interior doors (3)"), accepted by PayPal (200, `PAYER_ACTION_REQUIRED`), never approved or captured.
+
+## Live run of 3 Nov 2026
+
+The whole claim path through the app, with the limits it found: `docs/sandbox-evidence.md`.

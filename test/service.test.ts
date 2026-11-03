@@ -441,6 +441,17 @@ describe('sandbox contractor', () => {
     expect(posts()).toHaveLength(0);
   });
 
+  it('says so when the contractor has no money to refund the claim (live answer of 3 Nov 2026)', async () => {
+    await withClaim();
+    world.postAnswer = () => ({
+      status: 422,
+      body: { name: 'UNPROCESSABLE_ENTITY', message: 'The requested action could not be performed, semantically incorrect, or failed business validation.', debug_id: 'f94544838051f', details: [{ issue: 'INSUFFICIENT_FUNDS' }] },
+    });
+    const err = await failure(service.contractorAcceptClaim(CASE_ID));
+    expect(err).toMatchObject({ status: 409, code: 'CONTRACTOR_INSUFFICIENT_FUNDS' });
+    expect(err.message).toBe("The contractor's PayPal balance cannot cover this refund right now");
+  });
+
   it('answers PayPal with evidence, with a default note or its own, sandbox only', async () => {
     await withClaim();
     const plain = await service.contractorEvidence(CASE_ID, {});

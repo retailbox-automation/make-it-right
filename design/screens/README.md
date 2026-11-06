@@ -47,7 +47,7 @@ The object names below (`promised_item`, `verdict`, `claim`, `filing`, `dispute`
 | Name | Data |
 |---|---|
 | `payee` | contractor name in the heading |
-| `source_photo`, `source_name`, `source_date`, `source_count` | source cards: preview image, "Estimate.pdf" / "Text messages" / "Job-site photos", date, count (14 texts, 9 photos) |
+| `source_photo`, `source_name`, `source_date`, `source_count` | source cards: preview image, "Estimate.pdf" / "Text messages" / "Job-site photos", date, count (5 texts, 6 photos) |
 | slot `sources-meta`, `estimate-summary-1/2`, `texts-summary-1/2`, `photos-summary-1/2` | what was read from each source |
 | `data-item`, `title`, `price`, `source` | one row per promised item: title (with qty), price, source tag ("estimate p.1", "text Sep 9") |
 | slot `items-meta` | item count |

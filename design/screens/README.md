@@ -2,7 +2,7 @@
 
 Static HTML references for the four product screens. They set the look; the app wires the same structure to its data. No JavaScript and no libraries: icons and stamps are HTML/CSS or inline SVG, photos are local PNGs in each `assets/` folder. Fonts: Source Serif 4 for text, IBM Plex Mono for amounts (Google Fonts). Colors live in two `:root` blocks at the top of each file: the shared product tokens first, the screen's own values second.
 
-Demo data only: the contractor is the fictional "Ridgeway Electric". The homeowner paid $4,200.00 up front on Sep 12 with PayPal Goods & Services. The punch list has six promised items: GFCI outlets $260 (done), ceiling fan $310 (done), six recessed lights $720 (4 of 6 done, so $240 stays in the claim), main panel upgrade $1,800, EV charger circuit $650 and two flood lights $460 (not done). Photos prove $1,050 of work; the claim is $3,150. On every screen the work removed from the claim and the claim add up to exactly $4,200.
+Demo data only: the contractor is the fictional "Ridgeway Electric". The homeowner paid $3,700.00 up front on Sep 12 with PayPal Goods & Services. The punch list has six promised items: GFCI outlets $260 (done), ceiling fan $310 (done), six recessed lights $720 (4 of 6 done, so $240 stays in the claim), main panel upgrade $1,300, EV charger circuit $650 and two flood lights $460 (not done). Photos prove $1,050 of work; the claim is $2,650. On every screen the work removed from the claim and the claim add up to exactly $3,700.
 
 | Screen | File | Width | What it shows |
 |---|---|---|---|
@@ -51,7 +51,7 @@ The object names below (`promised_item`, `verdict`, `claim`, `filing`, `dispute`
 | slot `sources-meta`, `estimate-summary-1/2`, `texts-summary-1/2`, `photos-summary-1/2` | what was read from each source |
 | `data-item`, `title`, `price`, `source` | one row per promised item: title (with qty), price, source tag ("estimate p.1", "text Sep 9") |
 | slot `items-meta` | item count |
-| `paid_total` | sum of the item prices = the payment ($4,200.00) |
+| `paid_total` | sum of the item prices = the payment ($3,700.00) |
 | `method_check`, `method` | check 1: paid with PayPal Goods & Services |
 | `window_check`, `paid_at`, `day_n` | check 2: payment date and day N of 180 |
 | `eligibility_icon`, `eligibility_note` | line 3 is a neutral note, not a check: "may be eligible · PayPal decides" |
@@ -81,10 +81,10 @@ Below 600 px the same blocks restack in one column: heading, summary with the bu
 | Name | Data |
 |---|---|
 | `payee`, `offer_amount` | heading: "Ridgeway Electric offered $1,200.00"; the offer amount also appears in "Their offer" and on the Accept link |
-| `filed_at`, `claim_amount`, `claim_reason` | the filing strip: "You filed Oct 31 · $3,150.00 · Service not received"; `claim_amount` again under "Your claim" |
+| `filed_at`, `claim_amount`, `claim_reason` | the filing strip: "You filed Nov 4 · $2,650.00 · Service not received"; `claim_amount` again under "Your claim" |
 | `data-item`, `item_title`, `item_claim_amount`, `verdict_status` | one row per claimed item: short title, the amount it adds to the claim, the Not done / Partly tag |
 | `verdict_remaining`, `item_qty` | the partly done row: "2 of 6 lights" (2 = 6 − 4 done) |
-| `read_note`, `offer_gap` | "Our read": the explanation and the unpaid gap ($3,150.00 − $1,200.00 = $1,950.00), computed in code |
+| `read_note`, `offer_gap` | "Our read": the explanation and the unpaid gap ($2,650.00 − $1,200.00 = $1,450.00), computed in code |
 | `escalate` | "Ask PayPal to decide" (a button: the app escalates the case itself) |
 | `resolution_center_url` | "Accept $1,200.00" (a link with an external-link mark: the homeowner accepts on PayPal's site) |
 | slot `claim-note-1`, `claim-note-2`, `nav-1…3` | payment details and the 180-day window under the claim list; navigation |
@@ -94,7 +94,7 @@ Below 600 px the same blocks restack in one column: heading, summary with the bu
 | Name | Data |
 |---|---|
 | `outcome_status` | the "Money back" stamp |
-| `amount_refunded` | "+$3,150.00" |
+| `amount_refunded` | "+$2,650.00" |
 | slot `refund-detail`, `refund-ref` | where the money went (bank, last digits) and the case / transaction ids |
 | `filed_at`, `claim_amount` | step 1: filed in PayPal, claim amount |
 | `offer_received_at`, `offer_amount`, `offer_status` | step 2: the offer and the homeowner's answer ("declined") |

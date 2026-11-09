@@ -130,7 +130,7 @@ export function caseView(record: CaseRecord, now: Date): CaseView {
     verdicts: record.verdicts,
     claim,
     amounts: amountsOf(record, claim),
-    item_titles: Object.fromEntries(record.promised_items.map((item) => [item.id, shortTitle(item.title, item.qty)])),
+    item_titles: itemTitles(record.promised_items),
     filing: {
       filing_url: record.buyer_transaction_id ? `${RESOLUTION_CENTER_URL}/filing/${record.buyer_transaction_id}` : RESOLUTION_CENTER_URL,
       proof: [],
@@ -156,11 +156,31 @@ export interface ItemTitle {
   name: string;
 }
 
-/** The model's titles are long ("Recessed LED lights, kitchen ceiling"); the screens show the part before the first comma */
+const withQty = (name: string, qty: number) => (name && qty > 1 ? `${name} (${qty})` : name);
+
+/**
+ * The model's titles are long ("Recessed LED lights, kitchen ceiling"); the screens show the part before the first comma.
+ * A comma between two digits belongs to a number ("1,200 sq ft tile") and is not a cut.
+ */
 export function shortTitle(title: string, qty: number): ItemTitle {
   const full = title.trim();
-  const name = full.split(',')[0]!.trim() || full;
-  return { name, short: name && qty > 1 ? `${name} (${qty})` : name };
+  const cut = /,(?!(?<=\d,)\d)/.exec(full)?.index;
+  const name = (cut === undefined ? full : full.slice(0, cut).trim()) || full;
+  return { name, short: withQty(name, qty) };
+}
+
+/** Short titles for a punch list; items whose short names would be the same keep their full titles, so they stay told apart */
+export function itemTitles(items: PromisedItem[]): Record<string, ItemTitle> {
+  const shorts = items.map((item) => ({ item, title: shortTitle(item.title, item.qty) }));
+  const count = new Map<string, number>();
+  for (const { title } of shorts) count.set(title.name.toLowerCase(), (count.get(title.name.toLowerCase()) ?? 0) + 1);
+  return Object.fromEntries(
+    shorts.map(({ item, title }) => {
+      if ((count.get(title.name.toLowerCase()) ?? 0) < 2) return [item.id, title];
+      const full = item.title.trim();
+      return [item.id, { name: full, short: withQty(full, item.qty) }];
+    }),
+  );
 }
 
 function amountsOf(record: CaseRecord, claim: Claim): CaseView['amounts'] {

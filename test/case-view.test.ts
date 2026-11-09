@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { caseView, shortTitle } from '../src/service.js';
+import type { PromisedItem } from '../src/model.js';
+import { caseView, itemTitles, shortTitle } from '../src/service.js';
 import { NOW, paidCase } from './helpers/records.js';
 
 describe('short titles for the screens', () => {
@@ -11,9 +12,26 @@ describe('short titles for the screens', () => {
     ['  Two flood lights  ', 2, 'Two flood lights (2)', 'Two flood lights'],
     [', starts with a comma', 1, ', starts with a comma', ', starts with a comma'],
     ['', 3, '', ''],
+    ['1,200 sq ft tile', 1, '1,200 sq ft tile', '1,200 sq ft tile'],
+    ['1,200 sq ft tile, kitchen and hall', 2, '1,200 sq ft tile (2)', '1,200 sq ft tile'],
+    ['Tile, 1,200 sq ft', 1, 'Tile', 'Tile'],
+    ['Deck boards 2,400 ft,stained', 1, 'Deck boards 2,400 ft', 'Deck boards 2,400 ft'],
     ['   ', 1, '', ''],
   ])('%j with quantity %i → %j', (title, qty, short, name) => {
     expect(shortTitle(title, qty)).toEqual({ short, name });
+  });
+
+  it('show the full titles of items whose short names would be the same, so they stay told apart', () => {
+    const item = (id: string, title: string, qty: number): PromisedItem => ({ id, title, qty, price: '100.00', source: { kind: 'estimate', ref: 'estimate p.1', date: null, quote: '' } });
+    expect(itemTitles([item('1', 'Interior doors, upstairs', 2), item('2', 'interior doors, basement', 3), item('3', 'Window trim, front', 1)])).toEqual({
+      '1': { short: 'Interior doors, upstairs (2)', name: 'Interior doors, upstairs' },
+      '2': { short: 'interior doors, basement (3)', name: 'interior doors, basement' },
+      '3': { short: 'Window trim', name: 'Window trim' },
+    });
+    expect(itemTitles([item('1', 'Paint, walls', 1), item('2', 'Paint', 1)])).toEqual({
+      '1': { short: 'Paint, walls', name: 'Paint, walls' },
+      '2': { short: 'Paint', name: 'Paint' },
+    });
   });
 
   it('are in the case view for every promised item, by id', () => {

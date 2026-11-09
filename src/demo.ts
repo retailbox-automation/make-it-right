@@ -83,6 +83,10 @@ export function loadDemo(dir: string = DEMO_DIR, name: string = DEMO_TEMPLATE): 
   for (const verdict of input.verdicts) {
     if (verdict.photo_ref !== null && !ids.has(verdict.photo_ref)) throw new Error(`${where('recorded-analysis.json')}: item ${verdict.item_id} names photo "${verdict.photo_ref}", which is not in ${where('photos/')}`);
   }
+  // The screens show a light JPEG copy of each photo (made by scripts/demo-screen-photos.sh); the originals stay the proof
+  for (const id of ids) {
+    if (!existsSync(join(dir, 'screen', `${id}.jpg`))) throw new Error(`${where(`screen/${id}.jpg`)} is missing: run scripts/demo-screen-photos.sh demo/${name}`);
+  }
 
   const amount = isObject(payment) ? payment.amount : undefined;
   let paid_amount: string;

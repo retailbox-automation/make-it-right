@@ -91,17 +91,26 @@ function lookups(view) {
   const verdicts = new Map((view.verdicts ?? []).map((/** @type {any} */ v) => [v.item_id, v]));
   /** @type {Map<string, any>} */
   const lines = new Map((view.claim?.lines ?? []).map((/** @type {any} */ l) => [l.item_id, l]));
-  /** @type {Map<string, string>} */
-  const photos = new Map((view.photos ?? []).map((/** @type {any} */ p) => [p.id, p.url]));
+  /** @type {Map<string, { screen: string, original: string }>} */
+  const photos = new Map((view.photos ?? []).map((/** @type {any} */ p) => [p.id, { screen: p.screen_url || p.url, original: p.url }]));
   return { verdicts, lines, photos };
 }
 
-/** The photo a verdict names, as the exact file the photo check read; none → hidden */
-function photoField(/** @type {Map<string, string>} */ photos, /** @type {any} */ verdict) {
-  const src = verdict?.photo_ref ? photos.get(verdict.photo_ref) : undefined;
-  if (!src) return /** @type {Field} */ ({ hidden: true });
-  return /** @type {Field} */ ({ src, alt: verdict.note || 'Job-site photo', title: verdict.note || '', hidden: false });
+/**
+ * A photo on a screen: the light copy for the screens when the server gives one, and the link to the exact file the photo check read.
+ * No such photo → both hidden.
+ * @param {Map<string, { screen: string, original: string }>} photos @param {unknown} ref @param {string} alt @param {string} [title]
+ * @returns {{ photo: Field, file: Field }}
+ */
+export function photoFields(photos, ref, alt, title) {
+  const photo = typeof ref === 'string' ? photos.get(ref) : undefined;
+  if (!photo) return { photo: { hidden: true }, file: { hidden: true } };
+  return { photo: { src: photo.screen, alt, ...(title === undefined ? {} : { title }), hidden: false }, file: { href: photo.original, hidden: false } };
 }
+
+/** The photo a verdict names, with its note as the description */
+const verdictPhoto = (/** @type {Map<string, { screen: string, original: string }>} */ photos, /** @type {any} */ verdict) =>
+  photoFields(photos, verdict?.photo_ref, verdict?.note || 'Job-site photo', verdict?.note || '');
 
 /** @param {any} item @param {any} verdict */
 function stamp(item, verdict) {
@@ -261,6 +270,7 @@ export function screenModel(screen, view) {
     const count = (/** @type {number} */ n, /** @type {string} */ one, /** @type {string} */ many) => `${n} ${n === 1 ? one : many}`;
     const fromEstimate = items.filter((item) => item.source?.kind === 'estimate').length;
     const fromTexts = items.filter((item) => item.source?.kind === 'text').length;
+    const previewPhoto = photoFields(photos, preview, 'A job-site photo the photo check read');
     const proofPhotos = new Set((view?.verdicts ?? []).map((/** @type {any} */ v) => v.photo_ref).filter((/** @type {unknown} */ ref) => typeof ref === 'string' && photos.has(ref))).size;
     Object.assign(fields, {
       items_count: text(count(items.length, 'item', 'items')),
@@ -271,7 +281,8 @@ export function screenModel(screen, view) {
       estimate_date: text(day(estimateDate)),
       texts_count: text(view?.analysis?.text_count),
       photos_count: text(view?.photos ? view.photos.length : undefined),
-      photos_preview: preview ? { src: photos.get(preview), alt: 'A job-site photo the photo check read', hidden: false } : { hidden: true },
+      photos_preview: previewPhoto.photo,
+      photos_preview_file: previewPhoto.file,
       paid_total: text(money(claim.paid_total)),
       method_line: text(claim.method ? `Paid with ${claim.method}` : readOnly ? 'Paid in the demo story, not through PayPal' : 'Paid with: not confirmed by PayPal yet'),
       method_check: { state: claim.method ? 'pass' : 'unknown' },
@@ -312,6 +323,7 @@ export function screenModel(screen, view) {
       const verdict = verdicts.get(item.id);
       const line = lines.get(item.id);
       const mark = stamp(item, verdict);
+      const shot = verdictPhoto(photos, verdict);
       return {
         key: item.id,
         fields: {
@@ -321,7 +333,8 @@ export function screenModel(screen, view) {
           item_title: { text: short(item), title: fullTitle(item) },
           item_price_line: text(verdict?.status === 'partial' ? `${money(line?.claim_amount, true)} of ${money(item.price, true)}` : money(item.price, true)),
           verdict_note: text(verdict?.note || (verdict ? '' : 'No verdict: the item stays in the claim.')),
-          photo: photoField(photos, verdict),
+          photo: shot.photo,
+          photo_file: shot.file,
           verdict: { state: mark.state },
           verdict_label: { text: mark.label },
         },
@@ -330,10 +343,12 @@ export function screenModel(screen, view) {
     groups.tray = proven.map((item) => {
       const verdict = verdicts.get(item.id);
       const title = verdict?.status === 'partial' ? `${verdict.done_units} of ${item.qty} · ${name(item)}` : short(item);
+      const shot = verdictPhoto(photos, verdict);
       return {
         key: item.id,
         fields: {
-          photo: photoField(photos, verdict),
+          photo: shot.photo,
+          photo_file: shot.file,
           item_title: { text: title, title: fullTitle(item) },
           item_price: text(money(lines.get(item.id)?.proven_amount, true)),
           verdict: { state: 'done' },

@@ -5,7 +5,7 @@ import { KeyedLock } from '../src/lock.js';
 import type { CaseRecord, Dispute, Offer, Outcome } from '../src/model.js';
 import { caseView, CaseService, type CaseView } from '../src/service.js';
 import { MemoryStore } from '../src/store.js';
-import { caseIdFromPath, cents, day, isSandboxPayPalUrl, money, PLACEHOLDER, RECORDED_NOTE, resolutionCenterUrl, screenModel } from '../web/screens.js';
+import { caseIdFromPath, cents, day, isSandboxPayPalUrl, money, photoFields, PLACEHOLDER, RECORDED_NOTE, resolutionCenterUrl, screenModel } from '../web/screens.js';
 import { RIDGEWAY_ITEMS, RIDGEWAY_VERDICTS } from './helpers/demo.js';
 import { makeWorld } from './helpers/world.js';
 
@@ -141,7 +141,8 @@ describe('promised items', () => {
       next_url: { href: '/cases/demo-ridgeway/claim' },
       provenance_link: { href: '/demo/ridgeway/PROVENANCE.md', hidden: false },
     });
-    expect(model.fields.photos_preview!.src).toBe('/demo/ridgeway/photos/photo-3.png');
+    expect(model.fields.photos_preview!.src).toBe('/demo/ridgeway/screen/photo-3.jpg');
+    expect(model.fields.photos_preview_file).toEqual({ href: '/demo/ridgeway/photos/photo-3.png', hidden: false });
   });
 
   it('does not claim a PayPal payment the case does not have', () => {
@@ -168,11 +169,11 @@ describe('claim', () => {
       claim_amount: { text: '$2,650.00' },
       reason: { text: 'Service not received' },
     });
-    expect(model.groups.claim!.map((r) => [r.key, r.fields.item_price_line!.text, r.fields.verdict!.state, r.fields.verdict_label!.text, r.fields.photo!.src])).toEqual([
-      ['3', '$240 of $720', 'partly', 'Partly · 4 of 6', '/demo/ridgeway/photos/photo-3.png'],
-      ['4', '$1,300', 'not-done', 'Not done', '/demo/ridgeway/photos/photo-4.png'],
-      ['5', '$460', 'not-done', 'Not done', '/demo/ridgeway/photos/photo-6.png'],
-      ['6', '$650', 'not-done', 'Not done', '/demo/ridgeway/photos/photo-5.png'],
+    expect(model.groups.claim!.map((r) => [r.key, r.fields.item_price_line!.text, r.fields.verdict!.state, r.fields.verdict_label!.text, r.fields.photo!.src, r.fields.photo_file!.href])).toEqual([
+      ['3', '$240 of $720', 'partly', 'Partly · 4 of 6', '/demo/ridgeway/screen/photo-3.jpg', '/demo/ridgeway/photos/photo-3.png'],
+      ['4', '$1,300', 'not-done', 'Not done', '/demo/ridgeway/screen/photo-4.jpg', '/demo/ridgeway/photos/photo-4.png'],
+      ['5', '$460', 'not-done', 'Not done', '/demo/ridgeway/screen/photo-6.jpg', '/demo/ridgeway/photos/photo-6.png'],
+      ['6', '$650', 'not-done', 'Not done', '/demo/ridgeway/screen/photo-5.jpg', '/demo/ridgeway/photos/photo-5.png'],
     ]);
     const panel = model.groups.claim![1]!.fields;
     expect(panel.promise_quote!.text).toBe('“Main panel upgrade to 200A, new breakers, permit”');
@@ -183,11 +184,60 @@ describe('claim', () => {
     expect(model.groups.claim![3]!.fields.promise_source!.text).toBe('Text'); // "text Sep 9": the date is shown beside it once
     expect(model.groups.claim![3]!.fields.promise_date!.text).toBe('Sep 9');
 
-    expect(model.groups.tray!.map((r) => [r.key, r.fields.item_title!.text, r.fields.item_price!.text, r.fields.photo!.src])).toEqual([
-      ['1', 'GFCI outlets (4)', '$260', '/demo/ridgeway/photos/photo-1.png'],
-      ['2', 'Ceiling fan with light', '$310', '/demo/ridgeway/photos/photo-2.png'],
-      ['3', '4 of 6 · Recessed LED lights', '$480', '/demo/ridgeway/photos/photo-3.png'],
+    expect(model.groups.tray!.map((r) => [r.key, r.fields.item_title!.text, r.fields.item_price!.text, r.fields.photo!.src, r.fields.photo_file!.href])).toEqual([
+      ['1', 'GFCI outlets (4)', '$260', '/demo/ridgeway/screen/photo-1.jpg', '/demo/ridgeway/photos/photo-1.png'],
+      ['2', 'Ceiling fan with light', '$310', '/demo/ridgeway/screen/photo-2.jpg', '/demo/ridgeway/photos/photo-2.png'],
+      ['3', '4 of 6 · Recessed LED lights', '$480', '/demo/ridgeway/screen/photo-3.jpg', '/demo/ridgeway/photos/photo-3.png'],
     ]);
+  });
+
+  it('every photo shown on a screen has the link to the file the model read, and a hidden photo has none', () => {
+    for (const view of [walkthrough, copy]) {
+      const claim = screenModel('claim', view);
+      const rows = [...claim.groups.claim!, ...claim.groups.tray!];
+      expect(rows.length).toBe(7);
+      for (const { fields } of rows) {
+        expect(fields.photo!.hidden).toBe(false);
+        expect(fields.photo!.src).toMatch(/^\/demo\/ridgeway\/screen\/photo-\d\.jpg$/);
+        expect(fields.photo_file).toEqual({ href: fields.photo!.src!.replace('/screen/', '/photos/').replace(/\.jpg$/, '.png'), hidden: false });
+      }
+      const promised = screenModel('promised', view).fields;
+      expect(promised.photos_preview!.hidden).toBe(false);
+      expect(promised.photos_preview_file!.hidden).toBe(false);
+    }
+    // A case made from JSON has no photos: no picture and no link
+    for (const { fields } of screenModel('claim', plain).groups.claim!) expect([fields.photo, fields.photo_file]).toEqual([{ hidden: true }, { hidden: true }]);
+    expect(screenModel('promised', plain).fields.photos_preview_file).toEqual({ hidden: true });
+  });
+});
+
+describe('the photo mapper', () => {
+  const photos = new Map([
+    ['photo-1', { screen: '/demo/ridgeway/screen/photo-1.jpg', original: '/demo/ridgeway/photos/photo-1.png' }],
+    ['photo-2', { screen: '/api/cases/c1/photos/photo-2.png', original: '/api/cases/c1/photos/photo-2.png' }],
+  ]);
+  it('shows the light copy and links the original', () => {
+    expect(photoFields(photos, 'photo-1', 'Fuse box', 'Fuse box')).toEqual({
+      photo: { src: '/demo/ridgeway/screen/photo-1.jpg', alt: 'Fuse box', title: 'Fuse box', hidden: false },
+      file: { href: '/demo/ridgeway/photos/photo-1.png', hidden: false },
+    });
+  });
+  it('an uploaded photo without a light copy is shown and linked as itself', () => {
+    expect(photoFields(photos, 'photo-2', 'x')).toEqual({ photo: { src: '/api/cases/c1/photos/photo-2.png', alt: 'x', hidden: false }, file: { href: '/api/cases/c1/photos/photo-2.png', hidden: false } });
+  });
+  it.each([null, undefined, 'photo-9', 7])('no such photo (%s) → picture and link both hidden', (ref) => {
+    expect(photoFields(photos, ref, 'x')).toEqual({ photo: { hidden: true }, file: { hidden: true } });
+  });
+});
+
+describe('the server gives the light copy only for demo photos', () => {
+  it('copies of the demo case carry screen_url next to the original url; uploads do not', () => {
+    expect(walkthrough.photos?.map((p) => [p.url, p.screen_url])).toEqual(
+      [1, 2, 3, 4, 5, 6].map((n) => [`/demo/ridgeway/photos/photo-${n}.png`, `/demo/ridgeway/screen/photo-${n}.jpg`]),
+    );
+    const { template: _demo, ...own } = copyRecord;
+    const uploaded = caseView({ ...own, id: 'up1' }, NOW);
+    expect(uploaded.photos?.[0]).toEqual({ id: 'photo-1', name: 'photo-1.png', url: '/api/cases/up1/photos/photo-1.png' });
   });
 
   it('on the walkthrough sends a judge to make their own copy, not to PayPal', () => {

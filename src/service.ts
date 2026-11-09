@@ -72,8 +72,11 @@ export interface CaseView {
   dispute: Dispute | null;
   offer: Offer | null;
   outcome: Outcome | null;
-  /** The job-site photos uploaded for the photo check, in the order they were added; absent for cases made from JSON. `id` is what verdict.photo_ref says. */
-  photos?: Array<{ id: string; name: string; url: string }>;
+  /**
+   * The job-site photos uploaded for the photo check, in the order they were added; absent for cases made from JSON. `id` is what verdict.photo_ref says.
+   * `url` is the exact file the model read. `screen_url`, on copies of the demo case only, is a light JPEG copy of it for the screens (demo/<template>/screen/).
+   */
+  photos?: Array<{ id: string; name: string; url: string; screen_url?: string }>;
   /** Where the estimate the photo check read can be fetched; absent for cases made from JSON */
   estimate_url?: string;
   /** What the photo check noted while reading the job; only for cases made by the photo check */
@@ -141,7 +144,10 @@ export function caseView(record: CaseRecord, now: Date): CaseView {
     outcome: record.outcome,
     ...(record.uploads
       ? {
-          photos: record.uploads.photos.map((name) => ({ id: name.replace(/\.[^.]+$/, ''), name, url: `${files}/photos/${name}` })),
+          photos: record.uploads.photos.map((name) => {
+            const id = name.replace(/\.[^.]+$/, '');
+            return { id, name, url: `${files}/photos/${name}`, ...(record.template ? { screen_url: `${files}/screen/${id}.jpg` } : {}) };
+          }),
           estimate_url: record.template ? `${files}/${record.uploads.estimate}` : `${files}/estimate`,
         }
       : {}),

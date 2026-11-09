@@ -16,6 +16,8 @@ const CASE_ID = /^[A-Za-z0-9_-]{1,64}$/;
 const ORDER_ID = /^[A-Za-z0-9-]{1,64}$/;
 
 const SCREENS: Record<string, string> = { '': 'promised.html', claim: 'claim.html', offer: 'offer.html', 'money-back': 'money-back.html' };
+/** The screen copies of the demo photos: demo/<template>/screen/photo-N.jpg */
+const SCREEN_PHOTO = /^photo-\d{1,2}\.jpg$/;
 /** The demo files anyone may read: the inputs the model read, its recorded answer and where that answer came from */
 const DEMO_FILES = new Set(['estimate.pdf', 'texts.txt', 'payment.json', 'recorded-analysis.json', 'PROVENANCE.md']);
 
@@ -24,6 +26,8 @@ const TYPES: Record<string, string> = {
   js: 'text/javascript; charset=utf-8',
   css: 'text/css; charset=utf-8',
   png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
   pdf: 'application/pdf',
   txt: 'text/plain; charset=utf-8',
   md: 'text/plain; charset=utf-8',
@@ -143,6 +147,12 @@ export function registerWeb(app: Hono, deps: { service: CaseService; log: (messa
     const file = c.req.param('file');
     if (c.req.param('template') !== DEMO_TEMPLATE || !PHOTO_NAME.test(file)) throw notFound('photo');
     return sendFile(join(DEMO_DIR, 'photos', file), 'photo', 'public, max-age=86400');
+  });
+  // Light JPEG copies of the demo photos, for the screens; the files above are the ones the model read
+  app.get('/demo/:template/screen/:file', (c) => {
+    const file = c.req.param('file');
+    if (c.req.param('template') !== DEMO_TEMPLATE || !SCREEN_PHOTO.test(file)) throw notFound('photo');
+    return sendFile(join(DEMO_DIR, 'screen', file), 'photo', 'public, max-age=86400');
   });
   app.get('/demo/:template/:file', (c) => {
     const file = c.req.param('file');

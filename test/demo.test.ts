@@ -84,6 +84,40 @@ describe('the recorded demo case', () => {
     cpSync(join(DEMO_DIR, 'estimate.pdf'), join(dir, 'estimate.pdf'));
     writeFileSync(join(dir, 'payment.json'), JSON.stringify({ ...payment(), amount: 'a lot' }));
     expect(() => loadDemo(dir)).toThrow(/payment.json: amount/);
+    writeFileSync(join(dir, 'payment.json'), JSON.stringify(payment()));
+    rmSync(join(dir, 'screen', 'photo-4.jpg'));
+    expect(() => loadDemo(dir)).toThrow(/screen\/photo-4.jpg is missing/);
+  });
+});
+
+/** Width and height from a PNG's IHDR or a JPEG's first SOF marker; enough to compare shapes without a decoder */
+function imageSize(bytes: Buffer): { width: number; height: number } {
+  if (bytes.subarray(1, 4).toString('latin1') === 'PNG') return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+  expect(bytes.readUInt16BE(0)).toBe(0xffd8);
+  let at = 2;
+  while (at < bytes.length) {
+    const marker = bytes.readUInt16BE(at);
+    const length = bytes.readUInt16BE(at + 2);
+    if (marker >= 0xffc0 && marker <= 0xffcf && ![0xffc4, 0xffc8, 0xffcc].includes(marker)) return { width: bytes.readUInt16BE(at + 7), height: bytes.readUInt16BE(at + 5) };
+    at += 2 + length;
+  }
+  throw new Error('no frame header in the JPEG');
+}
+
+describe('the light copies of the demo photos the screens show', () => {
+  const referenced = [...new Set(loadDemo().input.verdicts.map((v) => v.photo_ref).filter((ref): ref is string => ref !== null))];
+
+  it('exist for every photo the recorded analysis names, under 300 KB, at most 1200 px, with the shape of the original', () => {
+    expect(referenced.sort()).toEqual(['photo-1', 'photo-2', 'photo-3', 'photo-4', 'photo-5', 'photo-6']);
+    for (const id of referenced) {
+      const copy = readFileSync(join(DEMO_DIR, 'screen', `${id}.jpg`));
+      const original = imageSize(readFileSync(join(DEMO_DIR, 'photos', `${id}.png`)));
+      const light = imageSize(copy);
+      expect(copy.length, id).toBeLessThan(300 * 1024);
+      expect(Math.max(light.width, light.height), id).toBeLessThanOrEqual(Math.min(1200, Math.max(original.width, original.height)));
+      // same aspect ratio: the copy's height is the original's scaled to the copy's width, within 1 px
+      expect(Math.abs(light.height - (original.height * light.width) / original.width), id).toBeLessThanOrEqual(1);
+    }
   });
 });
 

@@ -88,6 +88,8 @@ h1 { font-size: 66.1px; line-height: 66.1px; padding-bottom: 12px; font-weight: 
 .source-title a { color: inherit; }
 .source-title .dot { margin: 0 0.1em; }
 .source-line { margin-top: 16px; font-size: 15.5px; line-height: 19px; color: var(--muted-n1); }
+/* the preview is a light copy; this links the exact file the photo check read */
+.source-file { margin-top: 6px; width: fit-content; font-size: 14px; line-height: 17px; color: var(--muted-n1); }
 .src-1 { height: 130.9px; }
 .src-1 .source-photo { height: 112px; margin-top: 9.2px; }
 .src-1 .source-title { margin-top: 18.4px; letter-spacing: -0.65px; }
@@ -208,6 +210,7 @@ svg[data-state="fail"] .ic-box { fill: var(--terracotta); }
           <div class="source-body">
             <div class="source-title">Job-site photos · <span class="num" data-field="photos_count">—</span></div>
             <p class="source-line" data-field="photos_judged">—</p>
+            <a class="source-file" data-field="photos_preview_file" target="_blank" rel="noopener noreferrer" hidden>the file the model read</a>
           </div>
         </article>
       </div>

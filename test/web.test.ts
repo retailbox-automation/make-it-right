@@ -94,6 +94,18 @@ describe('pages', () => {
     }
   });
 
+  it('serves the light JPEG copies the screens show, as image/jpeg, and nothing else from screen/', async () => {
+    for (const n of [1, 2, 3, 4, 5, 6]) {
+      const res = await app.request(`/demo/ridgeway/screen/photo-${n}.jpg`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toBe('image/jpeg');
+      expect((await bytes(res)).equals(readFileSync(join(DEMO_DIR, 'screen', `photo-${n}.jpg`)))).toBe(true);
+    }
+    for (const path of ['/demo/ridgeway/screen/photo-9.jpg', '/demo/ridgeway/screen/photo-1.png', '/demo/other/screen/photo-1.jpg', '/demo/ridgeway/screen/..%2Fpayment.json']) {
+      expect((await app.request(path)).status, path).toBe(404);
+    }
+  });
+
   it('GET /healthz answers ok without asking PayPal', async () => {
     const res = await app.request('/healthz');
     expect(res.status).toBe(200);

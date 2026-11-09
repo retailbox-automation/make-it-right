@@ -74,4 +74,8 @@ The sandbox helper `POST /api/cases/:id/escalate` answered 200 and the claim rea
 
 - An open offer canceled by escalation, in PayPal's own events (the $500 claim is set up for it, waiting for the balance).
 - The contractor's evidence route, `POST /api/sim/contractor/:id/evidence`, in this run.
-- The photo check on the demo photos reaches the demo claim: it answered $1,025.00, not $3,150.00, because the current photos do not show what the demo says. They will be replaced.
+
+## After this run
+
+- **The demo claim is now $2,650.00** (paid $3,700.00, main panel $1,300.00), below the limit found above. On 4 Nov a claim of exactly $2,650.00 stayed in `INQUIRY` with the contractor's actions open, and the tracker found it by itself (`PP-R-NFZ-10196419`).
+- **The photo check reaches the demo claim:** with new demo photos (each one shows one promised item) it gives a claim of 2650.00 in 5 runs out of 5 (`demo/ridgeway/PROVENANCE.md`). The run above, on the old photos, answered $1,025.00.

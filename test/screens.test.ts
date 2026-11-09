@@ -202,7 +202,7 @@ describe('claim', () => {
   it('after the capture shows "File with PayPal" and the step text, and waits for the claim', () => {
     const { fields, waiting } = screenModel('claim', { ...captured(), filing: { filing_url: 'https://www.sandbox.paypal.com/resolutioncenter', proof: [], filed_at: null } });
     expect(fields.filing_url).toMatchObject({ text: 'File with PayPal', href: 'https://www.sandbox.paypal.com/resolutioncenter', action: '', target: '_blank' });
-    expect(fields.file_note!.text).toBe('On PayPal, file "Service not received" for $2,650.00, the amount shown. The app finds your claim within a minute or two.');
+    expect(fields.file_note!.text).toBe('On PayPal, file "Service not received" for $2,650.00, the amount shown. The app finds your claim within a few minutes (3 to 4 in our sandbox runs).');
     expect(fields.check_paypal).toEqual({ hidden: false, action: 'check' });
     expect(waiting).toBe(true);
   });

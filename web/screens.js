@@ -155,7 +155,7 @@ function claimStep(/** @type {any} */ view) {
   if (!dispute) {
     return {
       button: { text: 'File with PayPal', href: view.filing?.filing_url ?? null, action: '', target: '_blank' },
-      note: `On PayPal, file "Service not received" for ${money(claim.amount)}, the amount shown. The app finds your claim within a minute or two.`,
+      note: `On PayPal, file "Service not received" for ${money(claim.amount)}, the amount shown. The app finds your claim within a few minutes (3 to 4 in our sandbox runs).`,
       check: true,
       waiting: true,
     };

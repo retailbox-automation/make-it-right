@@ -42,7 +42,7 @@ body {
   width: 1440px;
   min-height: 810px;
   display: grid;
-  grid-template-rows: 72.2px 2px auto 526px 21.1px 2px 44.7px;
+  grid-template-rows: 72.2px 2px auto minmax(526px, auto) 21.1px 2px 44.7px;
 }
 .nowrap, .num, .mono { white-space: nowrap; }
 .mono { font-family: var(--font-mono); }
@@ -69,7 +69,7 @@ h1 { font-size: 66.1px; line-height: 66.1px; padding-bottom: 12px; font-weight: 
 
 /* ---------- three panels ---------- */
 .panels { display: grid; grid-template-columns: 386.7px 607.2px 383.3px; column-gap: 16.1px; padding-left: 14.6px; }
-.panel { border: 1px solid var(--frame-n1); height: 526px; display: flex; flex-direction: column; }
+.panel { border: 1px solid var(--frame-n1); min-height: 526px; padding-bottom: 8px; display: flex; flex-direction: column; }
 .panel-head { display: flex; align-items: flex-start; flex: none; border-bottom: 1px solid var(--ink); }
 .panel-head h2 { font-weight: 800; white-space: nowrap; margin-left: 3.3px; }
 .head-meta { margin: 26px 5px 0 auto; font-size: 17px; line-height: 20px; color: var(--muted-n1); white-space: nowrap; }
@@ -103,16 +103,16 @@ h1 { font-size: 66.1px; line-height: 66.1px; padding-bottom: 12px; font-weight: 
 .p-items h2 { font-size: 33.9px; line-height: 33.9px; margin-top: 17.6px; }
 .items { margin: 5.7px 14.2px 0 13.9px; display: flex; flex-direction: column; }
 .item {
-  height: 57.27px; flex: none;
-  display: grid; grid-template-columns: minmax(0, 1fr) 123.3px 172px; column-gap: 0;
+  min-height: 57.27px; flex: none; padding-bottom: 6px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 123.3px 156px; column-gap: 0;
   padding-left: 7.2px; align-items: start;
   border-bottom: 1px solid var(--frame-n1);
 }
 .item:last-child { border-bottom: 0; }
-.item-title { font-size: 23px; line-height: 30px; font-weight: 600; margin-top: 11.85px; white-space: nowrap; }
+.item-title { font-size: 23px; line-height: 26px; font-weight: 600; margin-top: 13.35px; min-width: 0; padding-right: 8px; }
 .item-price { font-family: var(--font-mono); font-weight: 500; font-size: 27px; line-height: 27px; margin-top: 12.6px; text-align: right; white-space: nowrap; }
 .item-source {
-  justify-self: start; margin: 13.8px 0 0 24px; height: 28.4px;
+  justify-self: start; margin: 13.8px 0 0 16px; height: 28.4px;
   display: flex; align-items: center; padding: 0 12.4px;
   border: 1px solid var(--frame-n1);
   font-family: var(--font-mono); font-weight: 600; font-size: 14.7px; line-height: 14.7px; white-space: nowrap;
@@ -221,7 +221,7 @@ svg[data-state="fail"] .ic-box { fill: var(--terracotta); }
       <div class="items" role="list" data-group="promised">
         <template>
           <div class="item" role="listitem">
-            <span class="item-title ellipsis" data-field="title">—</span>
+            <span class="item-title" data-field="title">—</span>
             <span class="item-price" data-field="price">—</span>
             <span class="item-source" data-field="source">—</span>
           </div>

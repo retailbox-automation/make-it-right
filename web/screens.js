@@ -1,7 +1,8 @@
 // @ts-check
 // Fills the screens from GET /api/cases/:id. Everything that turns the case into text (screenModel and the helpers above it)
 // is pure and tested in test/screens.test.ts; the DOM part at the bottom only copies what screenModel returns into the page.
-// Amounts are formatted here, never computed from scratch: the server computes every amount from the items and verdicts.
+// Amounts are only formatted and shown here: the server computes every amount (src/money.ts), including the offer's gap
+// and what the contractor keeps (`amounts` in the case view).
 
 export const PLACEHOLDER = '—';
 export const RECORDED_NOTE =
@@ -82,7 +83,7 @@ const capitalized = (/** @type {string} */ s) => (s ? s[0]?.toUpperCase() + s.sl
 const sourceLabel = (/** @type {any} */ source) => capitalized(String(source?.ref || source?.kind || '').replace(/\s+[A-Z][a-z]{2} \d{1,2}$/, ''));
 
 /** @param {any} item */
-const titleWithQty = (item) => (item.qty > 1 ? `${item.title} (${item.qty})` : item.title);
+const fullTitle = (item) => (item.qty > 1 ? `${item.title} (${item.qty})` : String(item.title ?? ''));
 
 /** @param {any} view */
 function lookups(view) {
@@ -131,7 +132,7 @@ function claimStep(/** @type {any} */ view) {
   if (view.case?.read_only) {
     return {
       button: { text: 'Try it with your sandbox account', href: '/#try', action: '', target: '' },
-      note: 'This walkthrough case is not paid. Start your own copy to pay, file and follow a claim in the PayPal sandbox.',
+      note: `This is the demo story, not a sandbox payment. Start your own copy to pay ${money(claim.paid_total)} in the PayPal sandbox.`,
       check: false,
       waiting: false,
     };
@@ -225,15 +226,23 @@ export function screenModel(screen, view) {
   const outcome = view?.outcome ?? null;
   const readOnly = !!view?.case?.read_only;
   const base = `/cases/${id}`;
-  const claimed = items.filter((item) => (cents(lines.get(item.id)?.claim_amount) ?? 0) > 0);
-  const proven = items.filter((item) => (cents(lines.get(item.id)?.proven_amount) ?? 0) > 0);
-  const filedAmount = dispute?.original_claim_amount ?? claim.amount;
+  const nonZero = (/** @type {unknown} */ amount) => (cents(amount) ?? 0) > 0;
+  const claimed = items.filter((item) => nonZero(lines.get(item.id)?.claim_amount));
+  const proven = items.filter((item) => nonZero(lines.get(item.id)?.proven_amount));
+  const amounts = view?.amounts ?? {};
+  // The short names the server made ("Recessed LED lights (6)"); the full title goes into the title attribute
+  const short = (/** @type {any} */ item) => view?.item_titles?.[item.id]?.short || PLACEHOLDER;
+  const name = (/** @type {any} */ item) => view?.item_titles?.[item.id]?.name || PLACEHOLDER;
+  const filedAmount = amounts.filed_claim;
 
   /** @type {Record<string, Field>} */
   const fields = {
     analysis_note: { text: RECORDED_NOTE, hidden: !view?.case?.template },
     case_notice: readOnly
-      ? { text: 'Walkthrough: the demo case as the recorded photo check sorted it. To try the PayPal steps, start your own copy from the start page.', hidden: false }
+      ? {
+          text: `This is the demo story, not a sandbox payment: nothing on this case was paid, filed or refunded in the PayPal sandbox. Start your own copy from the start page to pay ${money(claim.paid_total)} in the PayPal sandbox.`,
+          hidden: false,
+        }
       : { hidden: true },
     nav_promised: { href: base },
     nav_claim: { href: `${base}/claim` },
@@ -264,7 +273,7 @@ export function screenModel(screen, view) {
       photos_count: text(view?.photos ? view.photos.length : undefined),
       photos_preview: preview ? { src: photos.get(preview), alt: 'A job-site photo the photo check read', hidden: false } : { hidden: true },
       paid_total: text(money(claim.paid_total)),
-      method_line: text(claim.method ? `Paid with ${claim.method}` : 'Paid with: not confirmed by PayPal yet'),
+      method_line: text(claim.method ? `Paid with ${claim.method}` : readOnly ? 'Paid in the demo story, not through PayPal' : 'Paid with: not confirmed by PayPal yet'),
       method_check: { state: claim.method ? 'pass' : 'unknown' },
       paid_at: text(day(claim.paid_at)),
       day_n: text(claim.day_n),
@@ -274,7 +283,7 @@ export function screenModel(screen, view) {
     });
     groups.promised = items.map((item) => ({
       key: item.id,
-      fields: { title: { text: titleWithQty(item), title: titleWithQty(item) }, price: text(money(item.price, true)), source: text(item.source?.ref || item.source?.kind) },
+      fields: { title: { text: short(item), title: fullTitle(item) }, price: text(money(item.price, true)), source: text(item.source?.ref || item.source?.kind) },
     }));
   }
 
@@ -309,7 +318,7 @@ export function screenModel(screen, view) {
           promise_quote: text(item.source?.quote ? `“${item.source.quote}”` : ''),
           promise_source: text(sourceLabel(item.source)),
           promise_date: text(day(item.source?.date)),
-          item_title: { text: item.title, title: titleWithQty(item) },
+          item_title: { text: short(item), title: fullTitle(item) },
           item_price_line: text(verdict?.status === 'partial' ? `${money(line?.claim_amount, true)} of ${money(item.price, true)}` : money(item.price, true)),
           verdict_note: text(verdict?.note || (verdict ? '' : 'No verdict: the item stays in the claim.')),
           photo: photoField(photos, verdict),
@@ -320,12 +329,12 @@ export function screenModel(screen, view) {
     });
     groups.tray = proven.map((item) => {
       const verdict = verdicts.get(item.id);
-      const title = verdict?.status === 'partial' ? `${verdict.done_units} of ${item.qty} · ${item.title}` : item.title;
+      const title = verdict?.status === 'partial' ? `${verdict.done_units} of ${item.qty} · ${name(item)}` : short(item);
       return {
         key: item.id,
         fields: {
           photo: photoField(photos, verdict),
-          item_title: { text: title, title },
+          item_title: { text: title, title: fullTitle(item) },
           item_price: text(money(lines.get(item.id)?.proven_amount, true)),
           verdict: { state: 'done' },
         },
@@ -335,7 +344,7 @@ export function screenModel(screen, view) {
 
   if (screen === 'offer') {
     const { actions, step } = offerActions(view ?? {});
-    const gap = offer ? (cents(filedAmount) ?? 0) - (cents(offer.amount) ?? 0) : null;
+    const gap = offer ? amounts.offer_gap : null;
     const notDone = claimed.filter((item) => verdicts.get(item.id)?.status !== 'partial').length;
     const partly = claimed.length - notDone;
     const photoLine = `Photos show ${notDone} promised ${notDone === 1 ? 'item' : 'items'} not done${partly ? ` and ${partly} partly done` : ''}.`;
@@ -349,14 +358,20 @@ export function screenModel(screen, view) {
           : `Not filed yet · claim ready: ${money(filedAmount)} · ${REASONS[claim.reason] ?? PLACEHOLDER}`,
       ),
       claim_amount: text(money(filedAmount)),
-      claim_note_1: text(view?.case?.payment?.status === 'captured' ? `Paid ${day(claim.paid_at)} with ${claim.method ?? PLACEHOLDER}` : 'Not paid through PayPal yet'),
+      claim_note_1: text(
+        view?.case?.payment?.status === 'captured'
+          ? `Paid ${day(claim.paid_at)} with ${claim.method ?? PLACEHOLDER}`
+          : readOnly
+            ? 'The demo story: not a sandbox payment'
+            : 'Not paid through PayPal yet',
+      ),
       claim_note_2: text(typeof claim.day_n === 'number' ? `Day ${claim.day_n} of the 180 days PayPal allows for this claim` : PLACEHOLDER),
       offer_amount: text(offer ? money(offer.amount) : PLACEHOLDER),
       offer_status: text(offer ? `Offer ${offer.status}, received ${day(offer.received_at)}` : 'No offer yet'),
       read_note: text(
         offer
-          ? gap !== null && gap > 0
-            ? `The offer leaves ${money((gap / 100).toFixed(2))} of unfinished work unpaid. ${photoLine}`
+          ? nonZero(gap)
+            ? `The offer leaves ${money(gap)} of unfinished work unpaid. ${photoLine}`
             : `The offer covers the whole claim. ${photoLine}`
           : `${photoLine} The offer will be weighed against them.`,
       ),
@@ -371,11 +386,11 @@ export function screenModel(screen, view) {
     groups.offer = claimed.map((item) => {
       const verdict = verdicts.get(item.id);
       const mark = stamp(item, verdict);
-      const title = verdict?.status === 'partial' ? `${item.qty - verdict.done_units} of ${item.qty} · ${item.title}` : item.title;
+      const title = verdict?.status === 'partial' ? `${item.qty - verdict.done_units} of ${item.qty} · ${name(item)}` : short(item);
       return {
         key: item.id,
         fields: {
-          item_title: { text: title, title },
+          item_title: { text: title, title: fullTitle(item) },
           item_claim_amount: text(money(lines.get(item.id)?.claim_amount, true)),
           verdict_status: { text: mark.state === 'partly' ? 'Partly' : mark.label, state: mark.state },
         },
@@ -384,9 +399,7 @@ export function screenModel(screen, view) {
   }
 
   if (screen === 'money-back') {
-    const paid = cents(claim.paid_total);
-    const refunded = outcome ? cents(outcome.amount_refunded) : null;
-    const kept = outcome && paid !== null && refunded !== null ? (Math.max(0, paid - refunded) / 100).toFixed(2) : claim.proven_done;
+    const kept = amounts.kept_by_contractor;
     waiting = !!dispute && dispute.status !== 'RESOLVED';
     const payee = claim.payee_name || PLACEHOLDER;
     Object.assign(fields, {

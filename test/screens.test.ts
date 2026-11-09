@@ -2,7 +2,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { createDemoCopy, loadDemo, seedWalkthrough } from '../src/demo.js';
 import { Tracker } from '../src/disputes/tracker.js';
 import { KeyedLock } from '../src/lock.js';
-import { CaseService, type CaseView } from '../src/service.js';
+import type { CaseRecord, Dispute, Offer, Outcome } from '../src/model.js';
+import { caseView, CaseService, type CaseView } from '../src/service.js';
 import { MemoryStore } from '../src/store.js';
 import { caseIdFromPath, cents, day, isSandboxPayPalUrl, money, PLACEHOLDER, RECORDED_NOTE, resolutionCenterUrl, screenModel } from '../web/screens.js';
 import { RIDGEWAY_ITEMS, RIDGEWAY_VERDICTS } from './helpers/demo.js';
@@ -15,6 +16,7 @@ const NOW = new Date('2026-11-09T12:00:00.000Z');
 let walkthrough: CaseView;
 let copy: CaseView;
 let plain: CaseView;
+let copyRecord: CaseRecord;
 
 beforeAll(async () => {
   const world = makeWorld();
@@ -28,21 +30,26 @@ beforeAll(async () => {
   const demo = loadDemo();
   walkthrough = JSON.parse(JSON.stringify((await seedWalkthrough(service, demo)).view));
   copy = JSON.parse(JSON.stringify(await createDemoCopy(service, demo)));
+  copyRecord = (await store.get(copy.case.id))!;
   plain = JSON.parse(JSON.stringify(await service.createCase({ payee_name: 'Harbor Plumbing', promised_items: RIDGEWAY_ITEMS, verdicts: RIDGEWAY_VERDICTS })));
 });
 
+// Later states of the copy, made into views by the server's own caseView, so every amount in them is the server's
 const FILING = 'https://www.sandbox.paypal.com/resolutioncenter/filing/27S431280V029084G';
-const captured = () => ({
-  ...copy,
-  case: { ...copy.case, paid_at: '2026-11-09', payment: { order_id: 'O1', approve_url: 'https://www.sandbox.paypal.com/checkoutnow?token=O1', status: 'captured', capture_id: 'C1', capture_status: 'COMPLETED', captured_at: '2026-11-09T11:00:00Z', method: 'PayPal Goods & Services' } },
-  claim: { ...copy.claim, paid_at: '2026-11-09', method: 'PayPal Goods & Services', day_n: 0 },
-});
-const filed = (over: Record<string, unknown> = {}) => ({
-  ...captured(),
-  filing: { filing_url: FILING, proof: [], filed_at: '2026-11-09T11:05:00Z' },
-  dispute: { id: 'PP-R-AAA-1', status: 'WAITING_FOR_SELLER_RESPONSE', life_cycle_stage: 'INQUIRY', opened_at: '2026-11-09T11:05:00Z', escalated_at: null, dispute_amount: '2650.00', original_claim_amount: '2650.00', ...over },
-});
-const offer = (status = 'pending', amount = '1200.00') => ({ amount, type: 'REFUND', note: null, received_at: '2026-11-09T11:20:00Z', status });
+const viewOf = (over: Partial<CaseRecord>): CaseView => JSON.parse(JSON.stringify(caseView({ ...copyRecord, ...over }, NOW)));
+const PAID: Partial<CaseRecord> = {
+  paid_at: '2026-11-09',
+  payment: { order_id: 'O1', approve_url: 'https://www.sandbox.paypal.com/checkoutnow?token=O1', status: 'captured', capture_id: 'C1', capture_status: 'COMPLETED', captured_at: '2026-11-09T11:00:00Z', method: 'PayPal Goods & Services' },
+};
+const captured = () => viewOf(PAID);
+const filed = (over: Partial<Dispute> = {}, more: { offer?: Offer; outcome?: Outcome } = {}) =>
+  viewOf({
+    ...PAID,
+    buyer_transaction_id: '27S431280V029084G',
+    dispute: { id: 'PP-R-AAA-1', status: 'WAITING_FOR_SELLER_RESPONSE', life_cycle_stage: 'INQUIRY', opened_at: '2026-11-09T11:05:00Z', escalated_at: null, dispute_amount: '2650.00', original_claim_amount: '2650.00', ...over },
+    ...more,
+  });
+const offer = (status: Offer['status'] = 'pending', amount = '1200.00'): Offer => ({ amount, type: 'REFUND', note: null, received_at: '2026-11-09T11:20:00Z', status });
 const texts = (model: ReturnType<typeof screenModel>) => Object.values(model.fields).map((f) => f.text).filter((t): t is string => t !== undefined);
 
 describe('formatting', () => {
@@ -111,11 +118,11 @@ describe('promised items', () => {
   it('lists each promised item with its price and where it was promised; the total is what was paid', () => {
     const model = screenModel('promised', walkthrough);
     expect(model.groups.promised!.map((r) => [r.key, r.fields.title!.text, r.fields.price!.text, r.fields.source!.text])).toEqual([
-      ['1', 'GFCI outlets, kitchen and bath (4)', '$260', 'estimate p.1'],
-      ['2', 'Ceiling fan with light, living room', '$310', 'estimate p.1'],
-      ['3', 'Recessed LED lights, kitchen ceiling (6)', '$720', 'estimate p.1'],
-      ['4', 'Main panel upgrade to 200A, new breakers, permit', '$1,300', 'estimate p.1'],
-      ['5', 'LED flood lights over backyard, on a switch (2)', '$460', 'estimate p.1'],
+      ['1', 'GFCI outlets (4)', '$260', 'estimate p.1'],
+      ['2', 'Ceiling fan with light', '$310', 'estimate p.1'],
+      ['3', 'Recessed LED lights (6)', '$720', 'estimate p.1'],
+      ['4', 'Main panel upgrade to 200A', '$1,300', 'estimate p.1'],
+      ['5', 'LED flood lights over backyard (2)', '$460', 'estimate p.1'],
       ['6', '50A circuit for the EV charger in the garage', '$650', 'text Sep 9'],
     ]);
     expect(model.fields).toMatchObject({
@@ -139,7 +146,8 @@ describe('promised items', () => {
 
   it('does not claim a PayPal payment the case does not have', () => {
     const { fields } = screenModel('promised', walkthrough);
-    expect(fields.method_line).toEqual({ text: 'Paid with: not confirmed by PayPal yet' });
+    expect(fields.method_line).toEqual({ text: 'Paid in the demo story, not through PayPal' });
+    expect(screenModel('promised', copy).fields.method_line).toEqual({ text: 'Paid with: not confirmed by PayPal yet' });
     expect(fields.method_check).toEqual({ state: 'unknown' });
     expect(screenModel('promised', captured()).fields.method_line).toEqual({ text: 'Paid with PayPal Goods & Services' });
     expect(screenModel('promised', captured()).fields.method_check).toEqual({ state: 'pass' });
@@ -176,15 +184,16 @@ describe('claim', () => {
     expect(model.groups.claim![3]!.fields.promise_date!.text).toBe('Sep 9');
 
     expect(model.groups.tray!.map((r) => [r.key, r.fields.item_title!.text, r.fields.item_price!.text, r.fields.photo!.src])).toEqual([
-      ['1', 'GFCI outlets, kitchen and bath', '$260', '/demo/ridgeway/photos/photo-1.png'],
-      ['2', 'Ceiling fan with light, living room', '$310', '/demo/ridgeway/photos/photo-2.png'],
-      ['3', '4 of 6 · Recessed LED lights, kitchen ceiling', '$480', '/demo/ridgeway/photos/photo-3.png'],
+      ['1', 'GFCI outlets (4)', '$260', '/demo/ridgeway/photos/photo-1.png'],
+      ['2', 'Ceiling fan with light', '$310', '/demo/ridgeway/photos/photo-2.png'],
+      ['3', '4 of 6 · Recessed LED lights', '$480', '/demo/ridgeway/photos/photo-3.png'],
     ]);
   });
 
   it('on the walkthrough sends a judge to make their own copy, not to PayPal', () => {
     const { fields, waiting } = screenModel('claim', walkthrough);
     expect(fields.filing_url).toMatchObject({ text: 'Try it with your sandbox account', href: '/#try', action: '' });
+    expect(fields.file_note!.text).toBe('This is the demo story, not a sandbox payment. Start your own copy to pay $3,700.00 in the PayPal sandbox.');
     expect(fields.case_notice!.hidden).toBe(false);
     expect(waiting).toBe(false);
   });
@@ -200,7 +209,7 @@ describe('claim', () => {
   });
 
   it('after the capture shows "File with PayPal" and the step text, and waits for the claim', () => {
-    const { fields, waiting } = screenModel('claim', { ...captured(), filing: { filing_url: 'https://www.sandbox.paypal.com/resolutioncenter', proof: [], filed_at: null } });
+    const { fields, waiting } = screenModel('claim', captured());
     expect(fields.filing_url).toMatchObject({ text: 'File with PayPal', href: 'https://www.sandbox.paypal.com/resolutioncenter', action: '', target: '_blank' });
     expect(fields.file_note!.text).toBe('On PayPal, file "Service not received" for $2,650.00, the amount shown. The app finds your claim within a few minutes (3 to 4 in our sandbox runs).');
     expect(fields.check_paypal).toEqual({ hidden: false, action: 'check' });
@@ -229,15 +238,15 @@ describe('offer', () => {
     expect(fields.stand_in_offer).toEqual({ hidden: false, action: 'sim-offer' });
     expect(fields.escalate!.hidden).toBe(true);
     expect(groups.offer!.map((r) => [r.fields.item_title!.text, r.fields.item_claim_amount!.text, r.fields.verdict_status!.text])).toEqual([
-      ['2 of 6 · Recessed LED lights, kitchen ceiling', '$240', 'Partly'],
-      ['Main panel upgrade to 200A, new breakers, permit', '$1,300', 'Not done'],
-      ['LED flood lights over backyard, on a switch', '$460', 'Not done'],
+      ['2 of 6 · Recessed LED lights', '$240', 'Partly'],
+      ['Main panel upgrade to 200A', '$1,300', 'Not done'],
+      ['LED flood lights over backyard (2)', '$460', 'Not done'],
       ['50A circuit for the EV charger in the garage', '$650', 'Not done'],
     ]);
   });
 
   it('with an offer, weighs it against the claim and gives the homeowner the choice', () => {
-    const { fields } = screenModel('offer', { ...filed(), offer: offer() });
+    const { fields } = screenModel('offer', filed({}, { offer: offer() }));
     expect(fields.offer_title!.text).toBe('Ridgeway Electric offered $1,200.00');
     expect(fields.filed_line!.text).toBe('You filed Nov 9 · $2,650.00 · Service not received');
     expect(fields.read_note!.text).toBe('The offer leaves $1,450.00 of unfinished work unpaid. Photos show 3 promised items not done and 1 partly done.');
@@ -248,19 +257,19 @@ describe('offer', () => {
   });
 
   it('after the escalation, the stand-in answers PayPal first, then PayPal can be asked to decide (sandbox only)', () => {
-    const waitingForSeller = screenModel('offer', { ...filed({ life_cycle_stage: 'CHARGEBACK' }), offer: offer('canceled') }).fields;
+    const waitingForSeller = screenModel('offer', filed({ life_cycle_stage: 'CHARGEBACK' }, { offer: offer('canceled') })).fields;
     expect(waitingForSeller.stand_in_answer).toEqual({ hidden: false, action: 'sim-evidence' });
     expect(waitingForSeller.adjudicate!.hidden).toBe(true);
     expect(waitingForSeller.accept!.hidden).toBe(true);
-    const underReview = screenModel('offer', { ...filed({ life_cycle_stage: 'CHARGEBACK', status: 'UNDER_REVIEW' }), offer: offer('canceled') }).fields;
+    const underReview = screenModel('offer', filed({ life_cycle_stage: 'CHARGEBACK', status: 'UNDER_REVIEW' }, { offer: offer('canceled') })).fields;
     expect(underReview.adjudicate).toEqual({ hidden: false, action: 'adjudicate' });
     expect(underReview.stand_in_answer!.hidden).toBe(true);
-    const closed = screenModel('offer', { ...filed({ status: 'RESOLVED' }), offer: offer('accepted') }).fields;
+    const closed = screenModel('offer', filed({ status: 'RESOLVED' }, { offer: offer('accepted') })).fields;
     for (const name of ['stand_in_offer', 'accept', 'escalate', 'stand_in_answer', 'adjudicate']) expect(closed[name]!.hidden, name).toBe(true);
   });
 
   it('says when an offer covers the whole claim', () => {
-    expect(screenModel('offer', { ...filed(), offer: offer('pending', '2650.00') }).fields.read_note!.text).toMatch(/^The offer covers the whole claim\./);
+    expect(screenModel('offer', filed({}, { offer: offer('pending', '2650.00') })).fields.read_note!.text).toMatch(/^The offer covers the whole claim\./);
   });
 });
 
@@ -268,7 +277,7 @@ describe('money back', () => {
   const outcome = (amount: string, reason: string | null = null) => ({ status: 'money_back', amount_refunded: amount, refund_destination: 'the payment method you used', decided_at: '2026-11-09T11:40:00Z', outcome_code: 'RESOLVED_BUYER_FAVOUR', outcome_reason: reason });
 
   it('shows the refund, the steps and what the contractor kept', () => {
-    const view = { ...filed({ status: 'RESOLVED', life_cycle_stage: 'CHARGEBACK', escalated_at: '2026-11-09T11:30:00Z' }), offer: offer('canceled'), outcome: outcome('2650.00', 'INELIGIBLE_SELLER_PROTECTION_POLICY') };
+    const view = filed({ status: 'RESOLVED', life_cycle_stage: 'CHARGEBACK', escalated_at: '2026-11-09T11:30:00Z' }, { offer: offer('canceled'), outcome: outcome('2650.00', 'INELIGIBLE_SELLER_PROTECTION_POLICY') });
     const { fields } = screenModel('money-back', view);
     expect(fields).toMatchObject({
       outcome_status: { state: 'money_back' },
@@ -286,7 +295,7 @@ describe('money back', () => {
   });
 
   it('after an accepted offer, what the contractor kept is more than the photos prove, and says so', () => {
-    const { fields } = screenModel('money-back', { ...filed({ status: 'RESOLVED' }), offer: offer('accepted'), outcome: outcome('1200.00', 'INQUIRY_OFFER_PARTIAL_REFUND') });
+    const { fields } = screenModel('money-back', filed({ status: 'RESOLVED' }, { offer: offer('accepted'), outcome: outcome('1200.00', 'INQUIRY_OFFER_PARTIAL_REFUND') }));
     expect(fields.kept_title!.text).toBe('Kept by Ridgeway Electric: $2,500.00');
     expect(fields.kept_sub!.text).toBe('of which $1,050.00 is work the photos prove');
     expect(fields.step_decided_text!.text).toBe('Nov 9 · Offer accepted · refunded');
@@ -301,5 +310,57 @@ describe('money back', () => {
     expect(fields.kept_title!.text).toBe('Ridgeway Electric would keep $1,050.00');
     expect(fields.kept_sub!.text).toBe('for work the photos prove, once the claim is refunded');
     for (const step of ['step_filed', 'step_offer', 'step_sent', 'step_decided']) expect(fields[step]!.state).toBe('pending');
+  });
+});
+
+describe('the walkthrough is the demo story, never a sandbox payment', () => {
+  it.each(SCREENS)('%s says so plainly and shows no payment, filing or refund confirmed by PayPal', (screen) => {
+    const model = screenModel(screen, walkthrough);
+    expect(model.fields.case_notice).toEqual({
+      text: 'This is the demo story, not a sandbox payment: nothing on this case was paid, filed or refunded in the PayPal sandbox. Start your own copy from the start page to pay $3,700.00 in the PayPal sandbox.',
+      hidden: false,
+    });
+    const shown = [...texts(model), ...Object.values(model.groups).flat().flatMap((r) => Object.values(r.fields).map((f) => f.text ?? ''))].join(' | ');
+    expect(shown).not.toMatch(/Paid with PayPal|PayPal Goods & Services|You filed|Claim PP-|refunded to you|Money back|Kept by/);
+    for (const action of ['pay', 'capture', 'check', 'sim-offer', 'sim-evidence', 'escalate', 'adjudicate']) {
+      const live = Object.values(model.fields).filter((f) => f.action === action && f.hidden !== true);
+      expect(live, `${screen} ${action}`).toEqual([]);
+    }
+  });
+
+  it('keeps the story numbers on the claim screen and names where they come from', () => {
+    const { fields } = screenModel('claim', walkthrough);
+    expect(fields.paid_amount_short!.text).toBe('$3,700');
+    expect(fields.paid_line!.text).toBe('Paid Sep 12');
+    expect(screenModel('promised', walkthrough).fields.method_line!.text).toBe('Paid in the demo story, not through PayPal');
+    expect(screenModel('offer', walkthrough).fields.claim_note_1!.text).toBe('The demo story: not a sandbox payment');
+  });
+
+  it('the server keeps the walkthrough unpaid: no payment, claim or refund in its view', () => {
+    expect(walkthrough.case.payment).toBeNull();
+    expect(walkthrough.dispute).toBeNull();
+    expect(walkthrough.outcome).toBeNull();
+    expect(walkthrough.case.read_only).toBe(true);
+  });
+});
+
+describe('amounts the screens show come from the server', () => {
+  it('the offer\'s gap and what the contractor keeps are in the case view, and the screens only show them', () => {
+    const withOffer = filed({}, { offer: offer() });
+    expect(withOffer.amounts).toEqual({ filed_claim: '2650.00', offer_gap: '1450.00', kept_by_contractor: '1050.00' });
+    // a tampered view shows its own numbers: the screen does no arithmetic of its own
+    const odd = { ...withOffer, amounts: { ...withOffer.amounts, offer_gap: '7.00' } };
+    expect(screenModel('offer', odd).fields.read_note!.text).toMatch(/^The offer leaves \$7\.00 of unfinished work unpaid\./);
+    const accepted = filed({ status: 'RESOLVED' }, { offer: offer('accepted'), outcome: { status: 'money_back', amount_refunded: '1200.00', refund_destination: 'the payment method you used', decided_at: null, outcome_code: null, outcome_reason: null } });
+    expect(accepted.amounts.kept_by_contractor).toBe('2500.00');
+    expect(screenModel('money-back', { ...accepted, amounts: { ...accepted.amounts, kept_by_contractor: '9.00' } }).fields.kept_title!.text).toBe('Kept by Ridgeway Electric: $9.00');
+  });
+
+  it('shows the short titles the server made, with the full title kept as the element\'s title', () => {
+    const { groups } = screenModel('promised', walkthrough);
+    expect(groups.promised![0]!.fields.title).toEqual({ text: 'GFCI outlets (4)', title: 'GFCI outlets, kitchen and bath (4)' });
+    const odd = { ...walkthrough, item_titles: { ...walkthrough.item_titles, '1': { short: 'Server short', name: 'Server name' } } };
+    expect(screenModel('promised', odd).groups.promised![0]!.fields.title!.text).toBe('Server short');
+    expect(screenModel('claim', odd).groups.tray![0]!.fields.item_title!.text).toBe('Server short');
   });
 });

@@ -117,8 +117,7 @@ body {
   display: grid;
   grid-template-columns: 513.85px 512.6px;
   column-gap: 14.6px;
-  grid-template-rows: 216.1px 220.3px;
-  grid-auto-rows: 220.3px;
+  grid-auto-rows: minmax(216.1px, auto);
   padding-top: 0.8px;
   row-gap: 14.4px;
 }
@@ -134,33 +133,22 @@ body {
 .promised { padding: 10.7px 16px 0 17px; display: flex; flex-direction: column; min-width: 0; }
 .lbl { height: 20px; font-weight: 430; font-size: 14.2px; line-height: 20px; letter-spacing: -0.13px; white-space: nowrap; }
 .evidence .lbl { letter-spacing: -0.45px; }
-.quote {
-  margin: 8.3px 0 0;
-  height: 34px;
-  font-style: italic;
-  font-size: 14px;
-  line-height: 17px;
-  color: var(--quote);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
+.quote { margin: 8.3px 0 0; font-style: italic; font-size: 14px; line-height: 17px; color: var(--quote); }
 .source { margin-top: 1.7px; height: 16px; font-size: 13px; line-height: 16px; white-space: nowrap; color: var(--quote); }
-.item-title { margin: 25.5px 0 0; height: 28px; font-weight: 690; font-size: 23.6px; line-height: 28px; letter-spacing: -0.6px; }
-.item-price { margin-top: 2.4px; height: 24px; font-weight: 400; font-size: 20.7px; line-height: 24px; white-space: nowrap; }
-.note {
-  margin: 6px 0 0;
-  font-size: 12.5px;
-  line-height: 15px;
-  color: var(--caption);
+.item-title {
+  margin: 10px 0 0;
+  font-weight: 690;
+  font-size: 20px;
+  line-height: 24px;
+  letter-spacing: -0.4px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+.item-price { margin-top: 2.4px; height: 24px; font-weight: 400; font-size: 20.7px; line-height: 24px; white-space: nowrap; }
+.note { margin: 6px 0 12px; font-size: 12.5px; line-height: 15px; color: var(--caption); }
 .claim-card:nth-of-type(n+3) .promised { padding-top: 11.9px; }
-.claim-card:nth-of-type(n+3) .item-title { margin-top: 28.1px; }
 .claim-card:nth-of-type(n+3) .item-price { margin-top: 1.9px; }
 
 .evidence { border-left: 1px solid var(--divider); padding: 10.7px 0 0 15.8px; min-width: 0; }
@@ -326,12 +314,12 @@ body {
   .sum-row .v { font-size: 17.5px; }
   .row-paid, .row-proven, .row-claim { height: 58px; padding-top: 17px; }
   .file-btn { font-size: 20px; }
-  .cards { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-auto-rows: auto; row-gap: 16px; }
+  .cards { grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto; row-gap: 16px; }
   .claim-card { grid-template-columns: minmax(0, 1fr); }
   .promised, .claim-card:nth-of-type(n+3) .promised { padding: 12px 16px 14px; }
-  .quote { height: auto; margin-top: 8px; }
+  .quote { margin-top: 8px; }
   .source { margin-top: 3px; height: auto; }
-  .item-title, .claim-card:nth-of-type(n+3) .item-title { margin-top: 14px; font-size: 22px; height: auto; white-space: normal; }
+  .item-title { margin-top: 14px; min-height: 0; font-size: 22px; line-height: 26px; }
   .item-price, .claim-card:nth-of-type(n+3) .item-price { margin-top: 2px; }
   .evidence, .claim-card:nth-of-type(n+3) .evidence { border-left: 0; border-top: 1px solid var(--divider); padding: 12px 16px 16px; }
   .photo, .claim-card:nth-of-type(n+3) .photo { margin-top: 6px; width: 100%; height: auto; aspect-ratio: 235.5 / 166; container-type: inline-size; }
@@ -378,7 +366,7 @@ body {
             <div class="lbl">Promised</div>
             <p class="quote" data-field="promise_quote">—</p>
             <div class="source"><span data-field="promise_source">—</span> · <span data-field="promise_date">—</span></div>
-            <h2 class="item-title ellipsis" data-field="item_title">—</h2>
+            <h2 class="item-title" data-field="item_title">—</h2>
             <div class="item-price mono" data-field="item_price_line">—</div>
             <p class="note" data-field="verdict_note"></p>
           </div>

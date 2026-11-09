@@ -94,9 +94,9 @@ body {
   border-top: 2px solid var(--n2-rule-claim);
   border-bottom: 2px solid var(--n2-rule-claim);
 }
-.punch li { height: 62px; display: grid; grid-template-columns: minmax(0, 1fr) 112px 166px; align-items: start; border-bottom: 1px solid var(--n2-rule-thin); }
+.punch li { min-height: 62px; padding-bottom: 6px; display: grid; grid-template-columns: minmax(0, 1fr) 112px 166px; align-items: start; border-bottom: 1px solid var(--n2-rule-thin); }
 .punch li:last-child { border-bottom: 0; }
-.punch .name { padding-left: 1.3px; font-size: 27px; line-height: 58.6px; }
+.punch .name { padding: 14px 8px 0 1.3px; font-size: 24px; line-height: 28px; min-width: 0; }
 .punch .amt { text-align: right; font-family: var(--font-mono); font-weight: 400; font-size: 26.5px; line-height: 58.5px; }
 .punch .badge-cell { padding-left: 28px; }
 .badge { display: block; width: 138px; height: 37.9px; margin-top: 11.5px; text-align: center; color: var(--n2-badge-text); font-weight: 600; font-size: 24.5px; line-height: 34.8px; background: var(--n2-muted); }
@@ -179,7 +179,7 @@ body {
         <ul class="punch" data-group="offer">
           <template>
             <li>
-              <span class="name ellipsis" data-field="item_title">—</span>
+              <span class="name" data-field="item_title">—</span>
               <span class="amt" data-field="item_claim_amount">—</span>
               <span class="badge-cell"><span class="badge" data-field="verdict_status">—</span></span>
             </li>

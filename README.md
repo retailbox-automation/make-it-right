@@ -13,7 +13,7 @@ Demo: **https://makeitright.retailbox-automation.com** (no login).
 1. **Open the walkthrough** to see the demo case: what Ridgeway Electric (a made-up contractor) promised, what each photo shows, and the claim the app computes. Read-only.
 2. **Start with your PayPal sandbox account** makes your own copy of the demo case. Log in with your own PayPal sandbox Personal account and approve the $3,700.00 payment (sandbox money).
 3. Back in the app, press **File with PayPal** and file "Service not received" in the sandbox Resolution Center for the amounts the claim screen shows ($2,650.00 in total).
-4. The app finds your claim within a few minutes (3 to 4 in our sandbox runs). On the offer screen, **Sandbox stand-in: contractor makes an offer**, then accept it on PayPal or press **Ask PayPal to decide** (the hosted demo allows 5 such sandbox refunds a day, because the sandbox seller is shared). The money-back screen shows the outcome.
+4. The app finds your claim within a few minutes (3 to 4 in our sandbox runs); you can also press **Check PayPal now** on the claim screen. On the offer screen, **Sandbox stand-in: contractor makes an offer**, then accept it on PayPal or press **Ask PayPal to decide** (the hosted demo allows 5 such sandbox refunds a day, because the sandbox seller is shared). The money-back screen shows the outcome.
 
 No credentials of ours are needed. The photo check on the hosted demo replays a recorded analysis (see below); every PayPal call is live, in the sandbox.
 

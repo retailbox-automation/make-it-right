@@ -18,7 +18,8 @@
 # The start stops (exit 1) on anything missing: an unset variable, a failed login, a secret set that cannot be read,
 # is empty, or lacks the PayPal sandbox credentials or has them empty. There is no fallback to other values. Only
 # variable NAMES and a COUNT are ever logged, never a value. The machine identity's own credentials are removed from the
-# environment before the app starts: the token from the login is all `infisical run` needs.
+# environment before the app starts: the token from the login is all `infisical run` needs, and the app is started
+# without that token too.
 
 set -eu
 
@@ -106,4 +107,5 @@ esac
 
 log "${count} secrets at ${INFISICAL_SECRET_PATH} (env ${INFISICAL_ENV}): ${names}; starting the app"
 unset INFISICAL_UNIVERSAL_AUTH_CLIENT_ID INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET
-exec infisical run --projectId="$INFISICAL_PROJECT_ID" --env="$INFISICAL_ENV" --path="$INFISICAL_SECRET_PATH" -- "$@"
+# The CLI needs the token to read the secrets; the app does not get it
+exec infisical run --projectId="$INFISICAL_PROJECT_ID" --env="$INFISICAL_ENV" --path="$INFISICAL_SECRET_PATH" -- env -u INFISICAL_TOKEN "$@"

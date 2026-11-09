@@ -40,7 +40,7 @@ const IDENTITY = {
 };
 
 function run(env: Record<string, string>) {
-  const result = spawnSync('sh', [SCRIPT, 'sh', '-c', 'echo "app ran with $PAYPAL_SANDBOX_CLIENT_ID"'], {
+  const result = spawnSync('sh', [SCRIPT, 'sh', '-c', 'echo "app ran with $PAYPAL_SANDBOX_CLIENT_ID; vault token: ${INFISICAL_TOKEN:-none}"'], {
     env: { PATH: `${bin}:${dirname(process.execPath)}:/usr/bin:/bin`, ...env },
     encoding: 'utf8',
   });
@@ -53,18 +53,20 @@ describe.skipIf(asRoot)('the container entrypoint', () => {
   it('starts the app under `infisical run` with the folder of this service, logging names and a count only', () => {
     const { code, out, err } = run({ ...IDENTITY, FAKE_EXPORT: GOOD, INFISICAL_TOKEN: 'inherited-token' });
     expect(code).toBe(0);
-    expect(out).toBe('app ran with from-vault\n');
+    expect(out).toBe('app ran with from-vault; vault token: none\n');
     expect(err).toContain('infisical run: --projectId=proj-1 --env=prod --path=/make-it-right token=token-from-login');
     expect(err).toContain('3 secrets at /make-it-right (env prod): MIR_PUBLIC_DEMO, PAYPAL_SANDBOX_CLIENT_ID, PAYPAL_SANDBOX_CLIENT_SECRET; starting the app');
     for (const value of [SECRET_VALUE, 'AbC-id', 'identity-secret-7c1d', 'inherited-token']) expect(err).not.toContain(value);
   });
 
-  it('hands the app only the token: the machine identity\'s own credentials are removed before `infisical run`', () => {
+  it('hands the CLI only the token and the app neither the token nor the machine identity', () => {
     const { code, err } = run({ ...IDENTITY, FAKE_EXPORT: GOOD });
     expect(code).toBe(0);
     expect(err).toContain('identity id: unset');
     expect(err).toContain('identity secret: unset');
+    // the CLI reads the secrets with the token; the app itself is started without it
     expect(err).toContain('token=token-from-login');
+    expect(run({ ...IDENTITY, FAKE_EXPORT: GOOD, INFISICAL_TOKEN: 'inherited-token' }).out).toBe('app ran with from-vault; vault token: none\n');
   });
 
   it.each([
@@ -133,7 +135,7 @@ describe.skipIf(asRoot)('the container entrypoint', () => {
   it('runs the app as it is with SECRETS_SOURCE=platform, and refuses an unknown source', () => {
     const platform = run({ SECRETS_SOURCE: 'platform', PAYPAL_SANDBOX_CLIENT_ID: 'from-host' });
     expect(platform.code).toBe(0);
-    expect(platform.out).toBe('app ran with from-host\n');
+    expect(platform.out).toBe('app ran with from-host; vault token: none\n');
     const unknown = run({ SECRETS_SOURCE: 'files' });
     expect(unknown.code).toBe(1);
     expect(unknown.err).toContain("SECRETS_SOURCE must be infisical or platform, not 'files'");

@@ -68,6 +68,15 @@ describe.each(kinds)('%s', (_name, make) => {
     expect(await store.hasOrder('O2')).toBe(true);
   });
 
+  it('finds the case that recorded a PayPal order, and nothing for an unknown order', async () => {
+    const store = await make();
+    await store.put(record('one'));
+    await store.put({ ...record('two'), payment: null });
+    expect(await store.caseIdForOrder('O1')).toBe('one');
+    expect(await store.caseIdForOrder('O9')).toBeUndefined();
+    expect(await store.caseIdForOrder("O1' or '1'='1")).toBeUndefined();
+  });
+
   it('hands out copies: changing one does not change the store', async () => {
     const store = await make();
     await store.put(record('one'));

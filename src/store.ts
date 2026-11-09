@@ -10,6 +10,8 @@ export interface Store {
   list(): Promise<CaseRecord[]>;
   /** Is this PayPal order recorded on a case? Answered without reading the cases. */
   hasOrder(orderId: string): Promise<boolean>;
+  /** The id of the case that recorded this PayPal order, if any */
+  caseIdForOrder(orderId: string): Promise<string | undefined>;
   /** Is this PayPal dispute recorded on a case? */
   hasDispute(disputeId: string): Promise<boolean>;
   close(): Promise<void>;
@@ -34,6 +36,10 @@ export class MemoryStore implements Store {
 
   async hasOrder(orderId: string): Promise<boolean> {
     return [...this.cases.values()].some((c) => c.payment?.order_id === orderId);
+  }
+
+  async caseIdForOrder(orderId: string): Promise<string | undefined> {
+    return [...this.cases.values()].find((c) => c.payment?.order_id === orderId)?.id;
   }
 
   async hasDispute(disputeId: string): Promise<boolean> {
@@ -80,6 +86,11 @@ export class PgliteStore implements Store {
   async hasOrder(orderId: string): Promise<boolean> {
     const result = await this.db.query(`select 1 from cases where data->'payment'->>'order_id' = $1 limit 1`, [orderId]);
     return result.rows.length > 0;
+  }
+
+  async caseIdForOrder(orderId: string): Promise<string | undefined> {
+    const result = await this.db.query<{ id: string }>(`select id from cases where data->'payment'->>'order_id' = $1 order by id limit 1`, [orderId]);
+    return result.rows[0]?.id;
   }
 
   async hasDispute(disputeId: string): Promise<boolean> {

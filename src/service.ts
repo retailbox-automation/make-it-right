@@ -1,5 +1,6 @@
 // What the HTTP API does, one method per route. Everything PayPal says goes through here and comes out as a plain answer or an HttpError.
 import { randomBytes } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import type { Tracker } from './disputes/tracker.js';
 import { conflict, HttpError, invalid, notFound } from './errors.js';
 import { parseAmount, parseCaseInput, parseNote } from './input.js';
@@ -39,6 +40,10 @@ export interface CaseView {
     /** What the homeowner said they paid; only for cases made by the photo check */
     paid_amount?: string;
     payment: PaymentRecord | null;
+    /** The demo template the case was made from; its analysis is the recorded one (demo/<template>/PROVENANCE.md) */
+    template?: string;
+    /** The walkthrough case: it cannot be paid or changed */
+    read_only?: true;
   };
   promised_items: PromisedItem[];
   verdicts: Verdict[];
@@ -49,9 +54,28 @@ export interface CaseView {
   outcome: Outcome | null;
   /** The job-site photos uploaded for the photo check, in the order they were added; absent for cases made from JSON. `id` is what verdict.photo_ref says. */
   photos?: Array<{ id: string; name: string; url: string }>;
+  /** Where the estimate the photo check read can be fetched; absent for cases made from JSON */
+  estimate_url?: string;
   /** What the photo check noted while reading the job; only for cases made by the photo check */
-  analysis?: { warnings: string[] };
+  analysis?: { warnings: string[]; text_count?: number };
 }
+
+/** What a case made from files carries besides its punch list: given by the photo check, and by the copies of the demo case */
+export interface CaseFiles {
+  /** The id the files were saved under (from newCaseId()), or the fixed id of the walkthrough case */
+  id: string;
+  uploads: Uploads;
+  paid_amount: string;
+  warnings: string[];
+  /** How many text messages were read, when the caller knows it */
+  text_count?: number;
+  /** The files are those of this demo template (demo/<template>/), not in the upload store */
+  template?: string;
+  read_only?: boolean;
+}
+
+const readOnly = () =>
+  new HttpError(403, 'READ_ONLY_CASE', 'This is the walkthrough case everyone sees; it cannot be paid or changed. Start your own copy to try the PayPal steps.');
 
 export interface DisputeState {
   dispute: Dispute | null;
@@ -62,6 +86,8 @@ export interface DisputeState {
 export type SandboxAnswer = DisputeState & { sandbox_only: true; action: string; [extra: string]: unknown };
 
 export function caseView(record: CaseRecord, now: Date): CaseView {
+  // A demo copy shares the template's files, served as they are from demo/<template>/; uploaded files are served per case.
+  const files = record.template ? `/demo/${record.template}` : `/api/cases/${record.id}`;
   const claim = computeClaim(record.promised_items, record.verdicts, {
     payee_name: record.payee_name,
     transaction_id: record.buyer_transaction_id, // the homeowner's own id; our capture id means nothing to them
@@ -77,6 +103,8 @@ export function caseView(record: CaseRecord, now: Date): CaseView {
       paid_at: record.paid_at,
       ...(record.paid_amount === undefined ? {} : { paid_amount: record.paid_amount }),
       payment: record.payment,
+      ...(record.template ? { template: record.template } : {}),
+      ...(record.read_only ? { read_only: true as const } : {}),
     },
     promised_items: record.promised_items,
     verdicts: record.verdicts,
@@ -89,7 +117,12 @@ export function caseView(record: CaseRecord, now: Date): CaseView {
     dispute: record.dispute,
     offer: record.offer,
     outcome: record.outcome,
-    ...(record.uploads ? { photos: record.uploads.photos.map((name) => ({ id: name.replace(/\.[^.]+$/, ''), name, url: `/api/cases/${record.id}/photos/${name}` })) } : {}),
+    ...(record.uploads
+      ? {
+          photos: record.uploads.photos.map((name) => ({ id: name.replace(/\.[^.]+$/, ''), name, url: `${files}/photos/${name}` })),
+          estimate_url: record.template ? `${files}/${record.uploads.estimate}` : `${files}/estimate`,
+        }
+      : {}),
     ...(record.analysis ? { analysis: record.analysis } : {}),
   };
 }
@@ -135,8 +168,33 @@ export class CaseService {
     return this.newId();
   }
 
-  /** `saved` is given by the photo check: the id it took from newCaseId(), the files it saved under that id, and what it noted */
-  async createCase(body: unknown, saved?: { id: string; uploads: Uploads; paid_amount: string; warnings: string[] }): Promise<CaseView> {
+  /** `saved` is given by the photo check (the id it took from newCaseId(), the files it saved under that id, and what it noted) and by the demo copies */
+  async createCase(body: unknown, saved?: CaseFiles): Promise<CaseView> {
+    const record = this.newRecord(body, saved);
+    await this.deps.store.put(record);
+    return caseView(record, this.now());
+  }
+
+  /**
+   * A case with a fixed id, made from the same input at every start (the walkthrough case). A stored case with the same
+   * content is left alone; anything else under that id is replaced, keeping its first creation time.
+   */
+  async seedCase(body: unknown, saved: CaseFiles): Promise<{ view: CaseView; changed: boolean }> {
+    const fresh = this.newRecord(body, saved);
+    const existing = await this.deps.store.get(saved.id);
+    if (existing && isDeepStrictEqual({ ...existing, created_at: fresh.created_at }, fresh)) return { view: caseView(existing, this.now()), changed: false };
+    const record = existing ? { ...fresh, created_at: existing.created_at } : fresh;
+    await this.deps.store.put(record);
+    this.seen.delete(record.id);
+    return { view: caseView(record, this.now()), changed: true };
+  }
+
+  /** The case that recorded this PayPal order (PayPal sends the order id back as `token` when the homeowner returns) */
+  async caseIdForOrder(orderId: string): Promise<string | null> {
+    return (await this.deps.store.caseIdForOrder(orderId)) ?? null;
+  }
+
+  private newRecord(body: unknown, saved: CaseFiles | undefined): CaseRecord {
     const input = parseCaseInput(body);
     const id = saved?.id ?? this.newId();
     try {
@@ -144,7 +202,7 @@ export class CaseService {
     } catch (error) {
       throw invalid(error instanceof Error ? error.message : 'PayPal could not take this punch list');
     }
-    const record: CaseRecord = {
+    return {
       id,
       created_at: this.now().toISOString(),
       ...input,
@@ -153,10 +211,16 @@ export class CaseService {
       dispute: null,
       offer: null,
       outcome: null,
-      ...(saved ? { uploads: saved.uploads, paid_amount: saved.paid_amount, analysis: { warnings: saved.warnings } } : {}),
+      ...(saved
+        ? {
+            uploads: saved.uploads,
+            paid_amount: saved.paid_amount,
+            analysis: { warnings: saved.warnings, ...(saved.text_count === undefined ? {} : { text_count: saved.text_count }) },
+            ...(saved.template ? { template: saved.template } : {}),
+            ...(saved.read_only ? { read_only: true } : {}),
+          }
+        : {}),
     };
-    await this.deps.store.put(record);
-    return caseView(record, this.now());
   }
 
   async getCase(id: string): Promise<CaseView> {
@@ -167,6 +231,7 @@ export class CaseService {
   startPayment(id: string): Promise<{ order_id: string; approve_url: string }> {
     return this.deps.locks.run(id, async () => {
       const record = await this.mustGet(id);
+      if (record.read_only) throw readOnly();
       if (record.payment?.status === 'captured') throw conflict('ALREADY_PAID', 'This case is already paid');
       if (record.payment?.status === 'pending') throw conflict('PAYMENT_PENDING', 'PayPal is still completing this payment');
       if (record.payment) return { order_id: record.payment.order_id, approve_url: record.payment.approve_url };
@@ -190,6 +255,7 @@ export class CaseService {
   capture(id: string): Promise<CaseView> {
     return this.deps.locks.run(id, async () => {
       const record = await this.mustGet(id);
+      if (record.read_only) throw readOnly();
       const payment = record.payment;
       if (!payment) throw conflict('NO_PAYMENT', 'Start the payment first');
       if (payment.status === 'captured') return caseView(record, this.now());
@@ -292,6 +358,7 @@ export class CaseService {
   }
 
   private async withClaim(id: string): Promise<CaseRecord> {
+    if ((await this.mustGet(id)).read_only) throw readOnly();
     const record = await this.tick(id);
     if (!record.dispute) throw conflict('NO_CLAIM_YET', 'The claim has not been filed on PayPal yet, or PayPal has not listed it yet');
     return record;

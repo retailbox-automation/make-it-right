@@ -160,6 +160,10 @@ export interface CaseRecord {
   uploads?: Uploads;
   /** What the homeowner said they paid ("2200.00"); may differ from the sum of the items, see analysis.warnings. Absent for cases made from JSON. */
   paid_amount?: string;
-  /** What the photo check noted while reading the job. Absent for cases made from JSON. */
-  analysis?: { warnings: string[] };
+  /** What the photo check noted while reading the job, and how many text messages it read when that is known. Absent for cases made from JSON. */
+  analysis?: { warnings: string[]; text_count?: number };
+  /** The demo template the case was made from; its estimate and photos are the files in demo/<template>/, read by the recorded photo check */
+  template?: string;
+  /** The walkthrough case everyone sees: it is never paid or changed through the API */
+  read_only?: boolean;
 }

@@ -33,6 +33,11 @@ export function claimCents(item: PromisedItem, verdict: Verdict | undefined): nu
   }
 }
 
+/** What is left of `total` after `part`, never below zero: the gap an offer leaves in the claim, what the contractor keeps after a refund */
+export function remainder(total: string, part: string): string {
+  return fromCents(Math.max(0, toCents(total) - toCents(part)));
+}
+
 export interface ClaimContext {
   payee_name: string;
   transaction_id?: string | null;

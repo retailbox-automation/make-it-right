@@ -6,7 +6,7 @@ import { conflict, HttpError, invalid, notFound } from './errors.js';
 import { parseAmount, parseCaseInput, parseNote } from './input.js';
 import type { KeyedLock } from './lock.js';
 import type { CaseRecord, Claim, Dispute, Filing, Offer, Outcome, PaymentRecord, PromisedItem, Uploads, Verdict } from './model.js';
-import { computeClaim, toCents } from './money.js';
+import { computeClaim, remainder, toCents } from './money.js';
 import { PayPalError, RefusedRequestError, type PayPalClient } from './paypal/client.js';
 import { adjudicate, escalate, isActionNotYetAllowed } from './paypal/disputes.js';
 import { buildOrderBody, captureOrder, createOrder, readCapture } from './paypal/orders.js';
@@ -29,6 +29,8 @@ export interface ServiceDeps {
   now?: () => Date;
   newId?: () => string;
   log?: (message: string) => void;
+  /** How long a paid case's "no claim filed yet" is remembered before PayPal is asked again; 0 (the default) = not remembered */
+  noClaimMemoryMs?: number;
 }
 
 export interface CaseView {
@@ -48,6 +50,17 @@ export interface CaseView {
   promised_items: PromisedItem[];
   verdicts: Verdict[];
   claim: Claim;
+  /** Amounts that depend on PayPal's answers, computed here like every other amount */
+  amounts: {
+    /** The claim as filed (kept on our side when PayPal rewrites it), or the claim ready to file */
+    filed_claim: string;
+    /** What the contractor's offer leaves unpaid of the filed claim; null without an offer */
+    offer_gap: string | null;
+    /** What the contractor keeps: the payment less the refund once there is one, otherwise the work the photos prove */
+    kept_by_contractor: string;
+  };
+  /** Short names of the promised items for the screens, by item id; the full title stays in promised_items */
+  item_titles: Record<string, ItemTitle>;
   filing: Filing;
   dispute: Dispute | null;
   offer: Offer | null;
@@ -109,6 +122,8 @@ export function caseView(record: CaseRecord, now: Date): CaseView {
     promised_items: record.promised_items,
     verdicts: record.verdicts,
     claim,
+    amounts: amountsOf(record, claim),
+    item_titles: Object.fromEntries(record.promised_items.map((item) => [item.id, shortTitle(item.title, item.qty)])),
     filing: {
       filing_url: record.buyer_transaction_id ? `${RESOLUTION_CENTER_URL}/filing/${record.buyer_transaction_id}` : RESOLUTION_CENTER_URL,
       proof: [],
@@ -124,6 +139,29 @@ export function caseView(record: CaseRecord, now: Date): CaseView {
         }
       : {}),
     ...(record.analysis ? { analysis: record.analysis } : {}),
+  };
+}
+
+export interface ItemTitle {
+  /** The title up to its first comma, with the quantity when there is more than one: "Recessed LED lights (6)" */
+  short: string;
+  /** The same without the quantity, for lines that give a count themselves ("2 of 6 · Recessed LED lights") */
+  name: string;
+}
+
+/** The model's titles are long ("Recessed LED lights, kitchen ceiling"); the screens show the part before the first comma */
+export function shortTitle(title: string, qty: number): ItemTitle {
+  const full = title.trim();
+  const name = full.split(',')[0]!.trim() || full;
+  return { name, short: name && qty > 1 ? `${name} (${qty})` : name };
+}
+
+function amountsOf(record: CaseRecord, claim: Claim): CaseView['amounts'] {
+  const filed = record.dispute?.original_claim_amount ?? claim.amount;
+  return {
+    filed_claim: filed,
+    offer_gap: record.offer ? remainder(filed, record.offer.amount) : null,
+    kept_by_contractor: record.outcome ? remainder(claim.paid_total, record.outcome.amount_refunded) : claim.proven_done,
   };
 }
 
@@ -156,6 +194,8 @@ export class CaseService {
   private readonly log: (message: string) => void;
   /** What GET .../dispute last learned about each case, for DISPUTE_CACHE_MS */
   private readonly seen = new Map<string, { at: number; state: DisputeState }>();
+  /** Paid cases PayPal listed no claim for, and until when that answer stands (noClaimMemoryMs) */
+  private readonly noClaimUntil = new Map<string, number>();
 
   constructor(private readonly deps: ServiceDeps) {
     this.now = deps.now ?? (() => new Date());
@@ -244,6 +284,7 @@ export class CaseService {
       const payment: PaymentRecord = { order_id: created.order_id, approve_url: created.approve_url, status: 'created', capture_id: null, capture_status: null, captured_at: null, method: null };
       await this.deps.store.put({ ...record, payment });
       this.seen.delete(id);
+      this.noClaimUntil.delete(id);
       return { order_id: created.order_id, approve_url: created.approve_url };
     });
   }
@@ -276,6 +317,7 @@ export class CaseService {
       };
       await this.deps.store.put(next);
       this.seen.delete(id);
+      this.noClaimUntil.delete(id);
       if (!done) throw conflict('PAYMENT_NOT_COMPLETED', `PayPal has not completed the payment (status ${capture.status})`);
       return caseView(next, this.now());
     });
@@ -334,8 +376,18 @@ export class CaseService {
   }
 
   private async tick(id: string): Promise<CaseRecord> {
+    const memoryMs = this.deps.noClaimMemoryMs ?? 0;
+    const at = this.now().getTime();
+    const until = this.noClaimUntil.get(id);
+    if (until !== undefined && at < until) {
+      const stored = await this.mustGet(id);
+      if (!stored.dispute) return stored;
+    }
     const record = await viaPayPal(this.deps.tracker.tick(id));
     this.remember(record);
+    for (const [key, end] of this.noClaimUntil) if (end <= at) this.noClaimUntil.delete(key);
+    if (memoryMs > 0 && !record.dispute && record.payment?.status === 'captured') this.noClaimUntil.set(id, at + memoryMs);
+    else this.noClaimUntil.delete(id);
     return record;
   }
 

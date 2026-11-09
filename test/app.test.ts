@@ -44,7 +44,7 @@ describe('cases', () => {
     const res = await send('/api/cases', 'POST', demo());
     expect(res.status).toBe(201);
     const body = await json(res);
-    expect(Object.keys(body).sort()).toEqual(['case', 'claim', 'dispute', 'filing', 'offer', 'outcome', 'promised_items', 'verdicts']);
+    expect(Object.keys(body).sort()).toEqual(['amounts', 'case', 'claim', 'dispute', 'filing', 'item_titles', 'offer', 'outcome', 'promised_items', 'verdicts']);
     expect(body.claim).toMatchObject({ amount: '3150.00', proven_done: '1050.00', paid_total: '4200.00', reason: 'MERCHANDISE_OR_SERVICE_NOT_RECEIVED' });
     expect(body.case.id).toBe(CASE_ID);
   });

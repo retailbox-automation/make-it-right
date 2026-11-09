@@ -98,6 +98,50 @@ describe('the server', () => {
     await expect(start({ PORT: '0' }, { log: () => undefined })).rejects.toThrow(/PAYPAL_SANDBOX_CLIENT_ID/);
   });
 
+  it('stores the walkthrough case at start and leaves it alone on the next start, on the same data directory', async () => {
+    const logs: string[] = [];
+    const dir = mkdtempSync(join(tmpdir(), 'mir-server-'));
+    dirs.push(dir);
+    const env = { PAYPAL_SANDBOX_CLIENT_ID: 'id', PAYPAL_SANDBOX_CLIENT_SECRET: 'secret-value', PORT: '0', MIR_DATA_DIR: join(dir, 'db') };
+    const fake = fakePayPal();
+    const first = await start(env, { fetch: fake.fetch, log: (m) => logs.push(m) });
+    running.push(first);
+    const page = await fetch(`http://127.0.0.1:${first.port}/cases/demo-ridgeway/claim`);
+    expect(page.status).toBe(200);
+    expect(page.headers.get('content-type')).toBe('text/html; charset=utf-8');
+    const view = (await (await fetch(`http://127.0.0.1:${first.port}/api/cases/demo-ridgeway`)).json()) as { claim: { amount: string }; case: { read_only?: boolean } };
+    expect(view.claim.amount).toBe('2650.00');
+    expect(view.case.read_only).toBe(true);
+    await first.stop();
+    running.pop();
+
+    const second = await start(env, { fetch: fake.fetch, log: (m) => logs.push(m) });
+    running.push(second);
+    expect(logs.filter((m) => m.startsWith('walkthrough case'))).toEqual(['walkthrough case demo-ridgeway: stored', 'walkthrough case demo-ridgeway: unchanged']);
+    expect((await fetch(`http://127.0.0.1:${second.port}/healthz`)).status).toBe(200);
+    expect(fake.calls).toEqual([]);
+  });
+
+  it('runs the public demo over HTTP: no JSON cases, copies within the caps, counted by the proxy\'s address', async () => {
+    const { base } = await boot((d) => ({
+      MIR_PUBLIC_DEMO: '1', MIR_RETURN_URL: 'https://mir.example/paypal/return', MIR_CANCEL_URL: 'https://mir.example/paypal/cancel',
+      MIR_POLL_SECONDS: '600', MIR_DEMO_CASES_PER_ADDRESS_PER_DAY: '1', MIR_TRUST_FORWARDED_FOR: '1', MIR_DATA_DIR: join(d, 'public-db'),
+    }));
+    expect((await post(`${base}/api/cases`, caseBody())).status).toBe(403);
+    const ask = (address: string) => fetch(`${base}/api/demo/cases`, { method: 'POST', headers: { 'x-forwarded-for': address } });
+    const made = await ask('192.0.2.1');
+    expect(made.status).toBe(201);
+    expect(((await made.json()) as { claim: { amount: string } }).claim.amount).toBe('2650.00');
+    const over = await ask('192.0.2.1');
+    expect(over.status).toBe(429);
+    expect(((await over.json()) as { error: { message: string } }).error.message).toMatch(/This address has started 1 live demo cases today/);
+    expect((await ask('192.0.2.2')).status).toBe(201);
+  });
+
+  it('refuses to start the public demo without the address PayPal sends the homeowner back to', async () => {
+    await expect(start({ PAYPAL_SANDBOX_CLIENT_ID: 'id', PAYPAL_SANDBOX_CLIENT_SECRET: 's', PORT: '0', MIR_PUBLIC_DEMO: '1', MIR_POLL_SECONDS: '60' }, { log: () => undefined })).rejects.toThrow(/MIR_RETURN_URL/);
+  });
+
   it('stops cleanly twice', async () => {
     const { server } = await boot();
     await server.stop();

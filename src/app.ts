@@ -1,6 +1,9 @@
 // The HTTP API the screens call. JSON in, JSON out (photos and the estimate come back as the files they are); every error is {error: {code, message}}.
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
+import { DailyCaps } from './caps.js';
+import type { PublicDemoConfig } from './config.js';
+import { createDemoCopy, standInOfferAmount, type DemoTemplate } from './demo.js';
 import { HttpError, invalid, notFound } from './errors.js';
 import { PhotoCheckGate } from './gate.js';
 import { maxBodyBytes, readIntake, sizeText, UPLOAD_LIMITS, type UploadLimits } from './intake.js';
@@ -8,6 +11,7 @@ import type { VisionModel } from './models/vision.js';
 import { analyzeUpload } from './photocheck.js';
 import type { CaseService } from './service.js';
 import { PHOTO_NAME, type StoredUpload, type UploadStore } from './uploads.js';
+import { registerWeb } from './web.js';
 
 /** Biggest request body any /api route reads, except POST /api/cases/analyze (see maxBodyBytes in src/intake.ts) */
 export const MAX_BODY_BYTES = 256 * 1024;
@@ -26,7 +30,16 @@ export interface AppOptions {
   gate?: PhotoCheckGate;
   /** A proxy in front of the server adds the client's address to X-Forwarded-For (the last entry is taken); otherwise the connection's address counts */
   trustForwardedFor?: boolean;
+  /** The demo case's files; with them POST /api/demo/cases makes a copy of the demo case */
+  demo?: DemoTemplate;
+  /** The hosted demo: cases only from the demo template, within daily caps, and no photo check. Off unless given. */
+  publicDemo?: PublicDemoConfig;
+  /** The clock of the daily caps; tests set it */
+  now?: () => Date;
 }
+
+const PUBLIC_ANALYZE_MESSAGE =
+  'The hosted demo has no model: it replays the recorded analysis of the demo case by Gemma 4 31B (run locally on 2026-11-06). The live photo check runs when you run the app locally with a model.';
 
 /** The JSON body, or undefined when there is none. Present but not JSON is a 400. */
 async function body(request: Request): Promise<unknown> {
@@ -58,6 +71,8 @@ export function createApp(service: CaseService, options: AppOptions = {}): Hono 
   const large = bodyLimit({ maxSize: maxBodyBytes(limits), onError: (c) => c.json(tooLarge(maxBodyBytes(limits)), 413) });
 
   const gate = options.gate ?? new PhotoCheckGate();
+  const publicDemo = options.publicDemo ?? null;
+  const caps = publicDemo ? new DailyCaps({ ...publicDemo, ...(options.now ? { now: options.now } : {}) }) : null;
   const clientOf = (c: Context): string => {
     const forwarded = options.trustForwardedFor ? c.req.header('x-forwarded-for')?.split(',').at(-1)?.trim() : undefined;
     return forwarded || (c.env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined)?.incoming?.socket?.remoteAddress || 'unknown';
@@ -67,6 +82,7 @@ export function createApp(service: CaseService, options: AppOptions = {}): Hono 
   // The place in the gate is held until the answer is sent.
   app.use('/api/*', async (c, next) => {
     if (!isAnalyze(c.req.method, c.req.path)) return next();
+    if (publicDemo) throw new HttpError(503, 'PHOTO_CHECK_NOT_ON_HOST', PUBLIC_ANALYZE_MESSAGE);
     if (!(model && uploads)) throw new HttpError(503, 'PHOTO_CHECK_NOT_CONFIGURED', 'the photo check is not configured on this server (MIR_VISION_MODEL is not set)');
     const leave = gate.enter(clientOf(c));
     try {
@@ -83,7 +99,24 @@ export function createApp(service: CaseService, options: AppOptions = {}): Hono 
     c.req.raw = new Request(c.req.url, { method: 'POST' });
     return c.json(await analyzeUpload({ service, model: model!, uploads: uploads!, log }, intake), 201);
   });
-  app.post('/api/cases', async (c) => c.json(await service.createCase(await body(c.req.raw)), 201));
+  app.post('/api/cases', async (c) => {
+    if (publicDemo) {
+      throw new HttpError(403, 'PUBLIC_DEMO', 'The hosted demo makes cases only from the recorded demo case: use the "Start with your PayPal sandbox account" button (POST /api/demo/cases). Your own punch list works when you run the app locally.');
+    }
+    return c.json(await service.createCase(await body(c.req.raw)), 201);
+  });
+  // A copy of the demo case, made on the server; the request may not carry items or amounts. Daily caps in the public demo.
+  app.post('/api/demo/cases', async (c) => {
+    if (!options.demo) throw notFound('the demo case');
+    if ((await c.req.raw.text()).trim()) throw invalid('this request takes no body: the copy is made on the server from the recorded demo case');
+    const giveBack = caps?.take(clientOf(c));
+    try {
+      return c.json(await createDemoCopy(service, options.demo), 201);
+    } catch (error) {
+      giveBack?.();
+      throw error;
+    }
+  });
   app.get('/api/cases/:id', async (c) => c.json(await service.getCase(c.req.param('id'))));
   app.get('/api/cases/:id/photos/:name', async (c) => {
     const name = c.req.param('name');
@@ -98,9 +131,17 @@ export function createApp(service: CaseService, options: AppOptions = {}): Hono 
     const input = (await body(c.req.raw)) as { outcome?: unknown } | undefined;
     return c.json(await service.adjudicate(c.req.param('id'), input?.outcome));
   });
-  app.post('/api/sim/contractor/:id/offer', async (c) => c.json(await service.contractorOffer(c.req.param('id'), ((await body(c.req.raw)) ?? {}) as { amount?: unknown })));
+  app.post('/api/sim/contractor/:id/offer', async (c) => {
+    const id = c.req.param('id');
+    const requested = (((await body(c.req.raw)) ?? {}) as { amount?: unknown }).amount;
+    // On a copy of the demo case the stand-in's amount is fixed on the server; the case is read only when that matters
+    const template = publicDemo || requested === undefined ? (await service.getCase(id)).case.template : undefined;
+    return c.json(await service.contractorOffer(id, { amount: standInOfferAmount({ publicDemo: publicDemo !== null, template, requested }) }));
+  });
   app.post('/api/sim/contractor/:id/evidence', async (c) => c.json(await service.contractorEvidence(c.req.param('id'), ((await body(c.req.raw)) ?? {}) as { note?: unknown })));
   app.post('/api/sim/contractor/:id/accept-claim', async (c) => c.json(await service.contractorAcceptClaim(c.req.param('id'))));
+
+  registerWeb(app, { service, log });
 
   app.notFound((c) => c.json({ error: { code: 'NOT_FOUND', message: `no route ${c.req.method} ${new URL(c.req.url).pathname}` } }, 404));
   app.onError((error, c) => {

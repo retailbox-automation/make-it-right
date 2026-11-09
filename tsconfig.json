@@ -8,8 +8,9 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
+    "allowJs": true,
     "outDir": "dist",
     "types": ["node"]
   },
-  "include": ["src", "eval", "test", "scripts"]
+  "include": ["src", "eval", "test", "scripts", "web"]
 }

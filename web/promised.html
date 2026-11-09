@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1440">
+<title>Make It Right — Promised items</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700;8..60,800&amp;family=IBM+Plex+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<script type="module" src="/web/screens.js"></script>
+<style>
+:root {
+  --paper: #F4EFE6;
+  --ink: #23201C;
+  --graphite: #2B2926;
+  --sage: #6E8B5E;
+  --ochre: #C98A1B;
+  --terracotta: #B8502E;
+  --slot: #D9D5CF;
+  --font-serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+:root {
+  --slot-n1: #BEBBB8;
+  --frame-n1: #3C3833;
+  --rule-head-n1: #4E4943;
+  --rule-soft-n1: #9A958E;
+  --muted-n1: #77736E;
+  --on-dark-n1: #FAF9F7;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+html, body { background: var(--paper); }
+body {
+  width: 1440px;
+  color: var(--ink);
+  font-family: var(--font-serif);
+  -webkit-font-smoothing: antialiased;
+}
+.page {
+  width: 1440px;
+  min-height: 810px;
+  display: grid;
+  grid-template-rows: 72.2px 2px auto 526px 21.1px 2px 44.7px;
+}
+.nowrap, .num, .mono { white-space: nowrap; }
+.mono { font-family: var(--font-mono); }
+.ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+/* ---------- header (unified for all product screens) ---------- */
+.top { display: flex; align-items: flex-start; }
+.brand {
+  width: 296.4px; margin: 11.3px 0 0 34.3px;
+  font-size: 45.9px; line-height: 45.9px; font-weight: 700;
+  white-space: nowrap; letter-spacing: 0; color: var(--ink); text-decoration: none;
+}
+.brand-divider { width: 1px; height: 39.7px; margin-top: 14.6px; background: var(--ink); flex: none; }
+.env { margin: 22.6px 0 0 28.3px; font-size: 21px; line-height: 21px; font-weight: 400; color: var(--muted-n1); white-space: nowrap; }
+.nav { margin: 24px 30.2px 0 auto; display: flex; gap: 25.9px; }
+.nav a { font-size: 19px; line-height: 24px; color: var(--muted-n1); text-decoration: none; white-space: nowrap; }
+.nav a[aria-current="page"] { color: var(--ink); font-weight: 600; }
+.top-rule { background: var(--rule-head-n1); }
+
+/* ---------- title ---------- */
+.title-band { padding: 35.3px 0 0 32.6px; min-height: 142px; }
+h1 { font-size: 66.1px; line-height: 66.1px; padding-bottom: 12px; font-weight: 800; white-space: nowrap; letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; max-width: 1380px; }
+.notice { margin: 12px 32px 12px 0; padding: 8px 12px; border: 1px solid var(--frame-n1); font-size: 17px; line-height: 22px; max-width: 1360px; }
+
+/* ---------- three panels ---------- */
+.panels { display: grid; grid-template-columns: 386.7px 607.2px 383.3px; column-gap: 16.1px; padding-left: 14.6px; }
+.panel { border: 1px solid var(--frame-n1); height: 526px; display: flex; flex-direction: column; }
+.panel-head { display: flex; align-items: flex-start; flex: none; border-bottom: 1px solid var(--ink); }
+.panel-head h2 { font-weight: 800; white-space: nowrap; margin-left: 3.3px; }
+.head-meta { margin: 26px 5px 0 auto; font-size: 17px; line-height: 20px; color: var(--muted-n1); white-space: nowrap; }
+
+/* sources */
+.p-sources .panel-head { height: 69.2px; margin: 0 14.5px; }
+.p-sources h2 { font-size: 34.4px; line-height: 34.4px; margin-top: 17.2px; }
+.source-list { display: flex; flex-direction: column; margin: 29.3px 0 0 13.7px; width: 358.3px; }
+.source { border: 1px solid var(--ink); display: flex; align-items: flex-start; flex: none; }
+.source + .source { margin-top: 13.8px; }
+.source:nth-child(3) { margin-top: 13px; }
+.source-photo { flex: none; width: 129.2px; margin-left: 8.5px; display: block; background: var(--slot-n1); overflow: hidden; }
+.source-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.source-body { margin-left: 13.7px; display: flex; flex-direction: column; min-width: 0; }
+.source-title { font-size: 22.35px; line-height: 22.35px; font-weight: 700; white-space: nowrap; }
+.source-title a { color: inherit; }
+.source-title .dot { margin: 0 0.1em; }
+.source-line { margin-top: 16px; font-size: 15.5px; line-height: 19px; color: var(--muted-n1); }
+.src-1 { height: 130.9px; }
+.src-1 .source-photo { height: 112px; margin-top: 9.2px; }
+.src-1 .source-title { margin-top: 18.4px; letter-spacing: -0.65px; }
+.src-2 { height: 130px; }
+.src-2 .source-photo { height: 111.1px; margin-top: 7.5px; }
+.src-2 .source-title { margin-top: 17.5px; }
+.src-3 { height: 125.7px; }
+.src-3 .source-photo { height: 107.7px; margin-top: 7.6px; }
+.src-3 .source-title { margin-top: 14.9px; }
+
+/* promised items */
+.p-items .panel-head { height: 70.4px; margin: 0 14.2px 0 13.9px; }
+.p-items h2 { font-size: 33.9px; line-height: 33.9px; margin-top: 17.6px; }
+.items { margin: 5.7px 14.2px 0 13.9px; display: flex; flex-direction: column; }
+.item {
+  height: 57.27px; flex: none;
+  display: grid; grid-template-columns: minmax(0, 1fr) 123.3px 172px; column-gap: 0;
+  padding-left: 7.2px; align-items: start;
+  border-bottom: 1px solid var(--frame-n1);
+}
+.item:last-child { border-bottom: 0; }
+.item-title { font-size: 23px; line-height: 30px; font-weight: 600; margin-top: 11.85px; white-space: nowrap; }
+.item-price { font-family: var(--font-mono); font-weight: 500; font-size: 27px; line-height: 27px; margin-top: 12.6px; text-align: right; white-space: nowrap; }
+.item-source {
+  justify-self: start; margin: 13.8px 0 0 24px; height: 28.4px;
+  display: flex; align-items: center; padding: 0 12.4px;
+  border: 1px solid var(--frame-n1);
+  font-family: var(--font-mono); font-weight: 600; font-size: 14.7px; line-height: 14.7px; white-space: nowrap;
+}
+.total { margin: 8.9px 14.2px 0 13.9px; border-top: 1px solid var(--ink); display: flex; align-items: flex-start; height: 80px; }
+.total-label { font-size: 35.3px; line-height: 35.3px; font-weight: 700; margin: 19.2px 0 0 5.1px; white-space: nowrap; width: 290.9px; }
+.total-amount { font-family: var(--font-mono); font-weight: 500; font-size: 33.7px; line-height: 33.7px; margin-top: 20px; white-space: nowrap; }
+
+/* can PayPal help */
+.p-help { margin-left: 0.6px; }
+.p-help .panel-head { height: 72.3px; margin: 0 14px 0 15.3px; }
+.p-help h2 { font-size: 36px; line-height: 36px; margin-top: 14.8px; }
+.checks { margin: 24.5px 0 0 18.7px; display: flex; flex-direction: column; }
+.check { display: flex; align-items: flex-start; flex: none; }
+.check svg { flex: none; display: block; }
+.ic-box { fill: var(--sage); }
+.ic-mark { fill: none; stroke: var(--on-dark-n1); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+svg[data-state="unknown"] .ic-box { fill: var(--muted-n1); }
+svg[data-state="unknown"] .ic-mark { display: none; }
+svg[data-state="fail"] .ic-box { fill: var(--terracotta); }
+.ic-ring { fill: none; stroke: var(--muted-n1); stroke-width: 1.6; }
+.ic-dot { fill: var(--muted-n1); }
+.check-text { margin-left: 16.3px; font-size: 24.55px; line-height: 27.6px; font-weight: 500; width: 296px; }
+.check-1 { min-height: 55.2px; }
+.check-1 svg { margin-top: 8.1px; }
+.check-2 { height: 27.6px; margin-top: 24.9px; }
+.check-2 svg { margin-top: 1.2px; }
+.check-2 .check-text { margin-left: 17.8px; }
+.check-3 { margin-top: 30.2px; }
+.check-3 svg { margin-top: 2px; }
+.check-3 .check-text { font-size: 19px; line-height: 24px; width: 290px; }
+.btn {
+  display: block; flex: none;
+  margin: 34px 0 0 20.5px; width: 345.4px; height: 63.8px;
+  background: var(--graphite); color: var(--on-dark-n1);
+  font-size: 32.3px; line-height: 32.3px; font-weight: 500;
+  text-align: center; padding: 12.5px 0 0 14.8px;
+  text-decoration: none; white-space: nowrap;
+}
+.provenance { margin: 20px 18px 0 24.8px; font-size: 15px; line-height: 19.5px; color: var(--muted-n1); }
+
+/* ---------- footer ---------- */
+.foot-rule { margin: 0 22.4px 0 21.5px; background: var(--rule-soft-n1); }
+.foot { display: flex; align-items: flex-start; padding: 12px 36.2px 0 37px; font-size: 15px; line-height: 20px; color: var(--muted-n1); }
+.foot a { margin-left: auto; color: var(--muted-n1); }
+</style>
+</head>
+<body data-screen="promised">
+<div class="page">
+
+  <header class="top">
+    <a class="brand" href="/">Make It Right</a>
+    <span class="brand-divider" aria-hidden="true"></span>
+    <div class="env">PayPal sandbox</div>
+    <nav class="nav" aria-label="Case">
+      <a data-field="nav_promised" href="#" aria-current="page">Promised items</a>
+      <a data-field="nav_claim" href="#">Claim</a>
+      <a data-field="nav_offer" href="#">Offer</a>
+      <a data-field="nav_money_back" href="#">Money back</a>
+    </nav>
+  </header>
+  <div class="top-rule" aria-hidden="true"></div>
+
+  <div class="title-band">
+    <h1>What did <span data-field="payee">—</span> promise?</h1>
+    <p class="notice" data-field="case_notice" hidden></p>
+    <p class="notice" data-notice role="status" hidden></p>
+  </div>
+
+  <main class="panels">
+
+    <section class="panel p-sources" aria-label="Sources">
+      <div class="panel-head">
+        <h2>Sources</h2>
+      </div>
+      <div class="source-list">
+        <article class="source src-1">
+          <div class="source-photo"><img src="/web/assets/source-estimate.png" alt=""></div>
+          <div class="source-body">
+            <div class="source-title"><a data-field="estimate_name">Estimate</a> <span class="dot">·</span> <span data-field="estimate_date">—</span></div>
+            <p class="source-line" data-field="estimate_items">—</p>
+          </div>
+        </article>
+        <article class="source src-2">
+          <div class="source-photo"><img src="/web/assets/source-texts.png" alt=""></div>
+          <div class="source-body">
+            <div class="source-title">Text messages · <span class="num" data-field="texts_count">—</span></div>
+            <p class="source-line" data-field="text_items">—</p>
+          </div>
+        </article>
+        <article class="source src-3">
+          <div class="source-photo"><img data-field="photos_preview" alt="" hidden></div>
+          <div class="source-body">
+            <div class="source-title">Job-site photos · <span class="num" data-field="photos_count">—</span></div>
+            <p class="source-line" data-field="photos_judged">—</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel p-items" aria-label="Promised items found">
+      <div class="panel-head">
+        <h2>Promised items found</h2>
+        <span class="head-meta" data-field="items_count">—</span>
+      </div>
+      <div class="items" role="list" data-group="promised">
+        <template>
+          <div class="item" role="listitem">
+            <span class="item-title ellipsis" data-field="title">—</span>
+            <span class="item-price" data-field="price">—</span>
+            <span class="item-source" data-field="source">—</span>
+          </div>
+        </template>
+      </div>
+      <div class="total">
+        <span class="total-label">Total</span>
+        <span class="total-amount" data-field="paid_total">—</span>
+      </div>
+    </section>
+
+    <section class="panel p-help" aria-label="Can PayPal help?">
+      <div class="panel-head">
+        <h2>Can PayPal help?</h2>
+      </div>
+      <div class="checks">
+        <div class="check check-1">
+          <svg width="32.7" height="28.4" viewBox="0 0 32.7 28.4" aria-hidden="true" data-field="method_check" data-state="unknown">
+            <rect class="ic-box" width="32.7" height="28.4" rx="2.4"/>
+            <polyline class="ic-mark" points="8,14.9 13.3,20.6 24.6,7.4"/>
+          </svg>
+          <div class="check-text" data-field="method_line">—</div>
+        </div>
+        <div class="check check-2">
+          <svg width="32.7" height="28.4" viewBox="0 0 32.7 28.4" aria-hidden="true" data-field="window_check" data-state="unknown">
+            <rect class="ic-box" width="32.7" height="28.4" rx="2.4"/>
+            <polyline class="ic-mark" points="8,14.9 13.3,20.6 24.6,7.4"/>
+          </svg>
+          <div class="check-text nowrap"><span data-field="paid_at">—</span> · day <span class="num" data-field="day_n">—</span> of 180</div>
+        </div>
+        <div class="check check-3">
+          <svg width="32.7" height="28.4" viewBox="0 0 32.7 28.4" aria-hidden="true">
+            <circle class="ic-ring" cx="16.35" cy="14.2" r="13.3"/>
+            <circle class="ic-dot" cx="16.35" cy="8.6" r="1.6"/>
+            <rect class="ic-dot" x="15.15" y="11.7" width="2.4" height="9.6" rx="1.1"/>
+          </svg>
+          <div class="check-text" data-field="eligibility_note">—</div>
+        </div>
+      </div>
+      <a class="btn" href="#" data-field="next_url">Check the photos</a>
+      <p class="provenance" data-field="analysis_note" hidden></p>
+    </section>
+
+  </main>
+
+  <div aria-hidden="true"></div>
+  <div class="foot-rule" aria-hidden="true"></div>
+  <footer class="foot">
+    <span>PayPal sandbox only: no real money moves.</span>
+    <a data-field="provenance_link" href="#" hidden>Where the demo case comes from</a>
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en" translate="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1440">
+<title>Make It Right — Contractor's offer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
+<script type="module" src="/web/screens.js"></script>
+<style>
+:root {
+  --paper: #F4EFE6;
+  --ink: #23201C;
+  --graphite: #2B2926;
+  --sage: #6E8B5E;
+  --ochre: #C98A1B;
+  --terracotta: #B8502E;
+  --slot: #D9D5CF;
+  --font-serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+:root {
+  --n2-paper: #F3ECE2;
+  --n2-ink: #0E0A07;
+  --n2-border: #45413B;
+  --n2-border-strong: #1F1C19;
+  --n2-rule-hdr: #3A3631;
+  --n2-rule-claim: #5E5A54;
+  --n2-rule-thin: #55514B;
+  --n2-divider: #8E8981;
+  --n2-muted: #5A5652;
+  --n2-sandbox: #817D7A;
+  --n2-btn: #34322E;
+  --n2-btn-text: #FFFEF8;
+  --n2-badge-text: #FFFFFF;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; padding: 0; width: 1440px; }
+body {
+  background: var(--n2-paper);
+  color: var(--n2-ink);
+  font-family: var(--font-serif);
+  -webkit-font-smoothing: antialiased;
+}
+.page { width: 1440px; min-height: 810px; padding-bottom: 24px; position: relative; background: var(--n2-paper); }
+.mono { font-family: var(--font-mono); }
+.nowrap, .page h2, .amt, .badge { white-space: nowrap; }
+.ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+/* ---------- header (shared across Make It Right screens) ---------- */
+.hdr { height: 75px; display: flex; align-items: flex-start; border-bottom: 2px solid var(--n2-rule-hdr); padding-right: 34.4px; }
+.brand { margin: 6px 0 0 37.6px; font-weight: 700; font-size: 43.3px; line-height: 50px; white-space: nowrap; color: var(--n2-ink); text-decoration: none; }
+.hdr-div { width: 2px; height: 29.3px; margin: 17.2px 0 0 0; background: var(--n2-divider); flex: none; }
+.brand + .hdr-div { margin-left: 20px; }
+.sandbox { margin: 20.4px 0 0 25.4px; font-size: 22.3px; line-height: 30px; font-weight: 400; color: var(--n2-sandbox); white-space: nowrap; }
+.hdr-nav { margin: 21px 0 0 auto; display: flex; gap: 30px; }
+.hdr-nav a { font-size: 20px; line-height: 28px; color: var(--n2-sandbox); text-decoration: none; white-space: nowrap; }
+.hdr-nav a[aria-current="page"] { color: var(--n2-ink); font-weight: 600; }
+
+/* ---------- title + filed strip ---------- */
+.title { margin: 29.5px 36.8px 0; font-weight: 700; font-size: 70.7px; line-height: 78px; }
+.filed {
+  margin: 16.7px 0 0 33.5px;
+  width: 1373px;
+  height: 53px;
+  border: 2px solid var(--n2-border);
+  padding: 9.2px 0 0 21.1px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 23.4px;
+  line-height: 28px;
+  white-space: nowrap;
+}
+.notice { margin: 12px 0 0 33.5px; width: 1373px; padding: 8px 14px; border: 1px solid var(--n2-border); font-size: 18px; line-height: 24px; }
+
+/* ---------- two columns ---------- */
+.cols { margin: 17px 0 0 34px; display: grid; grid-template-columns: 606px 748px; column-gap: 19px; align-items: start; }
+.card { border: 2px solid var(--n2-border); }
+.sec-h { margin: 0; font-weight: 700; line-height: 52px; }
+.big-amt { margin: 0; font-family: var(--font-mono); font-weight: 500; font-size: 60px; line-height: 64px; white-space: nowrap; }
+
+/* left: your claim */
+.claim { min-height: 508px; padding-bottom: 20px; }
+.claim .sec-h { margin: 8.5px 0 0 25.1px; font-size: 44.9px; }
+.claim .big-amt { margin: 2.5px 0 0 27.2px; font-size: 60.5px; }
+.punch {
+  list-style: none;
+  margin: 16px 0 0 27.4px;
+  padding: 7px 0 7px;
+  width: 548.6px;
+  border-top: 2px solid var(--n2-rule-claim);
+  border-bottom: 2px solid var(--n2-rule-claim);
+}
+.punch li { height: 62px; display: grid; grid-template-columns: minmax(0, 1fr) 112px 166px; align-items: start; border-bottom: 1px solid var(--n2-rule-thin); }
+.punch li:last-child { border-bottom: 0; }
+.punch .name { padding-left: 1.3px; font-size: 27px; line-height: 58.6px; }
+.punch .amt { text-align: right; font-family: var(--font-mono); font-weight: 400; font-size: 26.5px; line-height: 58.5px; }
+.punch .badge-cell { padding-left: 28px; }
+.badge { display: block; width: 138px; height: 37.9px; margin-top: 11.5px; text-align: center; color: var(--n2-badge-text); font-weight: 600; font-size: 24.5px; line-height: 34.8px; background: var(--n2-muted); }
+.badge[data-state="not-done"] { background: var(--terracotta); letter-spacing: 0.6px; text-indent: 0.6px; }
+.badge[data-state="partly"] { background: var(--ochre); letter-spacing: 2.8px; text-indent: 2.8px; }
+.badge[data-state="unclear"] { font-size: 19px; }
+.claim-note { margin: 20px 27px 0; font-size: 19px; line-height: 25px; color: var(--n2-muted); }
+.claim-note + .claim-note { margin-top: 4px; }
+
+/* right column */
+.rcol { display: flex; flex-direction: column; }
+.offer { min-height: 149px; padding-bottom: 10px; }
+.offer .sec-h { margin: 11.1px 0 0 25.9px; font-size: 43.1px; }
+.offer .big-amt { margin: -1.5px 0 0 24.9px; font-size: 59.5px; }
+.offer-status { margin: 0 0 0 26px; font-size: 18px; line-height: 22px; color: var(--n2-muted); }
+.read { min-height: 193px; margin-top: 19px; padding-bottom: 12px; }
+.read .sec-h { margin: 3.75px 0 0 24.2px; font-size: 42.4px; }
+.read p { margin: 11.1px 0 0 25px; width: 716px; font-size: 26px; line-height: 32px; letter-spacing: 0.1px; }
+.provenance { margin: 12px 0 0 5.4px; font-size: 17px; line-height: 22px; color: var(--n2-muted); }
+.step { margin: 16px 0 0 5.4px; font-size: 21px; line-height: 27px; }
+.actions { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 16px 24px; }
+.btn-dark, .btn-sandbox {
+  appearance: none;
+  margin: 0;
+  height: 69px;
+  padding: 0 34px 4px;
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 30px;
+  line-height: 53.8px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.btn-dark { border: 0; width: 376px; padding-left: 46.1px; text-align: left; background: var(--n2-btn); color: var(--n2-btn-text); font-size: 33.4px; }
+.btn-sandbox { border: 2px dashed var(--n2-border-strong); background: none; color: var(--n2-ink); }
+.btn-dark[aria-busy="true"], .btn-sandbox[aria-busy="true"] { opacity: 0.6; cursor: progress; }
+.btn-accept {
+  display: block;
+  width: 348px;
+  height: 69px;
+  border: 2px solid var(--n2-border-strong);
+  padding: 0 0 0 43.6px;
+  color: var(--n2-ink);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 32.7px;
+  line-height: 59.8px;
+  white-space: nowrap;
+}
+.btn-accept .mono { font-weight: 400; font-size: 27.9px; margin-left: 2px; position: relative; top: 1px; }
+.btn-accept .ext { display: inline-block; width: 12px; height: 12px; margin-left: 6px; vertical-align: 0.5px; }
+.foot { margin: 11.75px 0 0 5.4px; font-size: 25.2px; line-height: 30px; color: var(--n2-muted); white-space: nowrap; }
+</style>
+</head>
+<body data-screen="offer">
+<div class="page">
+  <header class="hdr">
+    <a class="brand" href="/">Make It Right</a>
+    <span class="hdr-div" aria-hidden="true"></span>
+    <span class="sandbox">PayPal sandbox</span>
+    <nav class="hdr-nav" aria-label="Case">
+      <a data-field="nav_promised" href="#">Promised items</a>
+      <a data-field="nav_claim" href="#">Claim</a>
+      <a data-field="nav_offer" href="#" aria-current="page">Offer</a>
+      <a data-field="nav_money_back" href="#">Money back</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1 class="title ellipsis" data-field="offer_title">—</h1>
+
+    <p class="filed ellipsis" data-field="filed_line">—</p>
+    <p class="notice" data-field="case_notice" hidden></p>
+    <p class="notice" data-notice role="status" hidden></p>
+
+    <div class="cols">
+      <section class="card claim" aria-labelledby="claim-h">
+        <h2 class="sec-h" id="claim-h">Your claim</h2>
+        <p class="big-amt" data-field="claim_amount">—</p>
+        <ul class="punch" data-group="offer">
+          <template>
+            <li>
+              <span class="name ellipsis" data-field="item_title">—</span>
+              <span class="amt" data-field="item_claim_amount">—</span>
+              <span class="badge-cell"><span class="badge" data-field="verdict_status">—</span></span>
+            </li>
+          </template>
+        </ul>
+        <p class="claim-note" data-field="claim_note_1">—</p>
+        <p class="claim-note" data-field="claim_note_2">—</p>
+      </section>
+
+      <div class="rcol">
+        <section class="card offer" aria-labelledby="offer-h">
+          <h2 class="sec-h" id="offer-h">Their offer</h2>
+          <p class="big-amt" data-field="offer_amount">—</p>
+          <p class="offer-status" data-field="offer_status">—</p>
+        </section>
+
+        <section class="card read" aria-labelledby="read-h">
+          <h2 class="sec-h" id="read-h">Our read</h2>
+          <p data-field="read_note">—</p>
+        </section>
+        <p class="provenance" data-field="analysis_note" hidden></p>
+
+        <p class="step" data-field="offer_step">—</p>
+        <div class="actions">
+          <button type="button" class="btn-sandbox" data-field="stand_in_offer" hidden>Sandbox stand-in: contractor makes an offer</button>
+          <button type="button" class="btn-dark" data-field="escalate" hidden><span>Ask PayPal to decide</span></button>
+          <a class="btn-accept" data-field="accept" hidden>Accept <span class="mono" data-field="accept_amount">—</span><svg class="ext" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M2.5 9.5 9.5 2.5M4 2.5h5.5V8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square"/></svg></a>
+          <button type="button" class="btn-sandbox" data-field="stand_in_answer" hidden>Sandbox stand-in: contractor answers PayPal</button>
+          <button type="button" class="btn-sandbox" data-field="adjudicate" hidden>Sandbox only: PayPal decides, in your favor</button>
+        </div>
+        <p class="foot">Your call. The agent never moves money.</p>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

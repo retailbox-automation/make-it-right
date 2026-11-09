@@ -16,6 +16,15 @@ export interface Config {
   uploadQuotaBytes: number;
   /** One proxy stands in front of the server and adds the client's address to X-Forwarded-For; rate limits then count that address */
   trustForwardedFor: boolean;
+  /** null = not the public demo; otherwise cases are made only from the demo template, within these daily caps */
+  publicDemo: PublicDemoConfig | null;
+}
+
+export interface PublicDemoConfig {
+  /** New demo cases one client address may start per day (UTC) */
+  perAddressPerDay: number;
+  /** New demo cases all clients together may start per day (UTC) */
+  perDay: number;
 }
 
 export interface VisionConfig {
@@ -34,6 +43,9 @@ const MIN_NUM_CTX = 1024;
 const DEFAULT_QUOTA_MB = 2048;
 const DEFAULT_OLLAMA_URL = 'http://localhost:11434';
 const DEFAULT_NUM_CTX = 16384;
+/** A panel of judges often shares one address, so the per-address cap is generous */
+const DEFAULT_DEMO_PER_ADDRESS = 25;
+const DEFAULT_DEMO_PER_DAY = 60;
 
 /** MIR_VISION_MODEL=ollama:<model name> (with MIR_OLLAMA_URL and MIR_NUM_CTX); unset or empty = no photo check */
 function loadVision(env: Env): VisionConfig | null {
@@ -64,6 +76,40 @@ function loadQuota(env: Env): number {
   return mb;
 }
 
+function wholeAtLeastOne(env: Env, name: string, fallback: number): number {
+  const raw = env[name];
+  if (!raw) return fallback;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1) throw new Error(`${name} must be a whole number, 1 or more`);
+  return n;
+}
+
+function isWebAddress(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * MIR_PUBLIC_DEMO=1 (or true): the hosted demo. It needs the addresses PayPal sends the homeowner back to and the claim poller;
+ * without them a judge would pay and land nowhere, or file a claim the app never finds, so the start fails instead.
+ */
+function loadPublicDemo(env: Env, pollSeconds: number | null): PublicDemoConfig | null {
+  if (env.MIR_PUBLIC_DEMO !== '1' && env.MIR_PUBLIC_DEMO !== 'true') return null;
+  for (const name of ['MIR_RETURN_URL', 'MIR_CANCEL_URL']) {
+    const value = env[name];
+    if (!value || !isWebAddress(value)) throw new Error(`MIR_PUBLIC_DEMO needs ${name}: the public http(s) address of /paypal/${name === 'MIR_RETURN_URL' ? 'return' : 'cancel'}`);
+  }
+  if (pollSeconds === null) throw new Error('MIR_PUBLIC_DEMO needs MIR_POLL_SECONDS, so filed claims are found without anyone asking');
+  return {
+    perAddressPerDay: wholeAtLeastOne(env, 'MIR_DEMO_CASES_PER_ADDRESS_PER_DAY', DEFAULT_DEMO_PER_ADDRESS),
+    perDay: wholeAtLeastOne(env, 'MIR_DEMO_CASES_PER_DAY', DEFAULT_DEMO_PER_DAY),
+  };
+}
+
 export function loadConfig(env: Env): Config {
   const missing = ['PAYPAL_SANDBOX_CLIENT_ID', 'PAYPAL_SANDBOX_CLIENT_SECRET'].filter((name) => !env[name]);
   if (missing.length) throw new Error(`missing environment: ${missing.join(', ')}`);
@@ -89,5 +135,6 @@ export function loadConfig(env: Env): Config {
     vision: loadVision(env),
     uploadQuotaBytes: loadQuota(env) * 1024 * 1024,
     trustForwardedFor: env.MIR_TRUST_FORWARDED_FOR === '1' || env.MIR_TRUST_FORWARDED_FOR === 'true',
+    publicDemo: loadPublicDemo(env, pollSeconds),
   };
 }

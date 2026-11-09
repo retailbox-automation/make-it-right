@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { serve } from '@hono/node-server';
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
+import { loadDemo, seedWalkthrough, WALKTHROUGH_ID, type DemoTemplate } from './demo.js';
 import { Tracker, startPoller } from './disputes/tracker.js';
 import { openJournal, type Journal } from './journal.js';
 import { KeyedLock } from './lock.js';
@@ -24,6 +25,8 @@ export interface StartDeps {
   fetch?: typeof fetch;
   /** Tests give a fake Ollama; the real run uses the global fetch */
   modelFetch?: typeof fetch;
+  /** The demo case's files; read from demo/ridgeway/ unless a test gives others */
+  demo?: DemoTemplate;
   log?: (message: string) => void;
 }
 
@@ -31,7 +34,8 @@ export async function start(env: Record<string, string | undefined> = process.en
   const config = loadConfig(env);
   const log = deps.log ?? ((m: string) => console.error(m));
 
-  // The journal file is opened first: a bad path stops the start before anything else is opened.
+  // The demo files are read first and the journal file is opened next: a broken demo or a bad path stops the start before anything else is opened.
+  const demo = deps.demo ?? loadDemo();
   const journal: Journal | null = config.journalPath ? openJournal(config.journalPath, log) : null;
   let store: PgliteStore | null = null;
   let server: ReturnType<typeof serve> | null = null;
@@ -57,7 +61,17 @@ export async function start(env: Record<string, string | undefined> = process.en
     const openStore = store;
     const removed = await uploads.sweep(async (caseId) => (await openStore.get(caseId)) !== undefined);
     if (removed.length) log(`removed leftover upload directories: ${removed.join(', ')}`);
-    const app = createApp(service, { log, uploads, trustForwardedFor: config.trustForwardedFor, ...(model ? { model } : {}) });
+    const seeded = await seedWalkthrough(service, demo);
+    log(`walkthrough case ${WALKTHROUGH_ID}: ${seeded.changed ? 'stored' : 'unchanged'}`);
+    if (config.publicDemo) log(`public demo: new demo cases at most ${config.publicDemo.perAddressPerDay} per address and ${config.publicDemo.perDay} in all per day`);
+    const app = createApp(service, {
+      log,
+      uploads,
+      demo,
+      trustForwardedFor: config.trustForwardedFor,
+      ...(model ? { model } : {}),
+      ...(config.publicDemo ? { publicDemo: config.publicDemo } : {}),
+    });
 
     poller = config.pollSeconds
       ? startPoller(() => tracker.tickOpenCases(), config.pollSeconds * 1000, (e) => log(`poller: ${e instanceof Error ? e.message : String(e)}`))
@@ -96,7 +110,7 @@ export async function start(env: Record<string, string | undefined> = process.en
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   start().then(
-    (running) => console.error(`Make It Right API (PayPal sandbox) listening on port ${running.port}`),
+    (running) => console.error(`Make It Right (PayPal sandbox) listening on port ${running.port}`),
     (error) => {
       console.error(error instanceof Error ? error.message : String(error));
       process.exit(1);

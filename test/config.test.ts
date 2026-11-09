@@ -8,7 +8,7 @@ describe('loadConfig', () => {
     expect(loadConfig(creds)).toEqual({
       port: 8787, dataDir: './data', clientId: 'id', clientSecret: 'secret',
       returnUrl: 'http://localhost:8787/paypal/return', cancelUrl: 'http://localhost:8787/paypal/cancel',
-      pollSeconds: null, journalPath: null, vision: null, uploadQuotaBytes: 2048 * 1024 * 1024, trustForwardedFor: false,
+      pollSeconds: null, journalPath: null, vision: null, uploadQuotaBytes: 2048 * 1024 * 1024, trustForwardedFor: false, publicDemo: null,
     });
   });
 
@@ -93,6 +93,31 @@ describe('loadConfig', () => {
 
     it.each(['0', '-5', 'lots', '1.5'])('rejects a quota of %j', (value) => {
       expect(() => loadConfig({ ...creds, MIR_UPLOADS_QUOTA_MB: value })).toThrow(/MIR_UPLOADS_QUOTA_MB/);
+    });
+
+    it('is not the public demo unless MIR_PUBLIC_DEMO is 1 or true', () => {
+      expect(loadConfig(creds).publicDemo).toBeNull();
+      expect(loadConfig({ ...creds, MIR_PUBLIC_DEMO: '0' }).publicDemo).toBeNull();
+    });
+
+    const host = { ...creds, MIR_PUBLIC_DEMO: '1', MIR_RETURN_URL: 'https://mir.example/paypal/return', MIR_CANCEL_URL: 'https://mir.example/paypal/cancel', MIR_POLL_SECONDS: '60' };
+
+    it('caps new demo cases at 25 per address and 60 in all per day unless told otherwise', () => {
+      expect(loadConfig(host).publicDemo).toEqual({ perAddressPerDay: 25, perDay: 60 });
+      expect(loadConfig({ ...host, MIR_PUBLIC_DEMO: 'true', MIR_DEMO_CASES_PER_ADDRESS_PER_DAY: '3', MIR_DEMO_CASES_PER_DAY: '9' }).publicDemo).toEqual({ perAddressPerDay: 3, perDay: 9 });
+    });
+
+    it.each(['0', '-1', 'many', '2.5'])('rejects a daily cap of %j', (value) => {
+      expect(() => loadConfig({ ...host, MIR_DEMO_CASES_PER_DAY: value })).toThrow(/MIR_DEMO_CASES_PER_DAY must be a whole number/);
+      expect(() => loadConfig({ ...host, MIR_DEMO_CASES_PER_ADDRESS_PER_DAY: value })).toThrow(/MIR_DEMO_CASES_PER_ADDRESS_PER_DAY must be a whole number/);
+    });
+
+    it('refuses to start the public demo without the return addresses or the claim poller', () => {
+      const { MIR_RETURN_URL: _r, ...noReturn } = host;
+      expect(() => loadConfig(noReturn)).toThrow(/MIR_PUBLIC_DEMO needs MIR_RETURN_URL/);
+      expect(() => loadConfig({ ...host, MIR_CANCEL_URL: 'not a url' })).toThrow(/MIR_PUBLIC_DEMO needs MIR_CANCEL_URL/);
+      const { MIR_POLL_SECONDS: _p, ...noPoller } = host;
+      expect(() => loadConfig(noPoller)).toThrow(/MIR_PUBLIC_DEMO needs MIR_POLL_SECONDS/);
     });
 
     it('trusts X-Forwarded-For only when asked', () => {

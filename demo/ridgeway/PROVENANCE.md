@@ -20,7 +20,7 @@ The files in this folder are the exact inputs of the photo check for the demo jo
 
 ## The photos on the screens
 
-The screens show resized JPEG copies of the photos (`screen/`) so the pages load quickly; the files in `photos/` are the exact inputs the model judged, and every photo on a screen links to its original ("the file the model read"). The copies were made with `scripts/demo-screen-photos.sh demo/ridgeway`, which runs `sips -s format jpeg -s formatOptions 80 -Z 1200 photos/photo-N.png --out screen/photo-N.jpg` on each photo (long side at most 1200 px, never enlarged; quality 65 instead of 80 where 80 gave more than 250 KB, which was photo-4): the same picture, no crop or other change.
+The screens show resized JPEG copies of the photos (`screen/`) so the pages load quickly; the files in `photos/` are the exact inputs the model judged, and every photo on a screen links to its original ("the file the model read"). The copies were made with `scripts/demo-screen-photos.sh demo/ridgeway`, which runs `sips -s format jpeg -s formatOptions 80 -Z 1200 photos/photo-N.png --out screen/photo-N.jpg` on each photo (long side at most 1200 px, never enlarged; quality 65 instead of 80 where 80 gave more than 250 KB, which was photo-4 and photo-6): the same picture, no crop or other change.
 
 ## What the app reads from the answer
 

@@ -25,6 +25,7 @@ No credentials of ours are needed. The photo check on the hosted demo replays a 
 | The photo check is Gemma 4 31B, and the hosted demo replays its recorded answer | `demo/ridgeway/recorded-analysis.json` (verbatim), `demo/ridgeway/PROVENANCE.md`: the same claim, 2650.00, in 5 runs out of 5 | the note "Photo check: recorded analysis by Gemma 4 31B" on every screen |
 | The payment is a PayPal order made of the promised items | `src/paypal/orders.ts` | your sandbox account shows the order with its six items; PayPal's claim form lists them one by one |
 | The app finds the homeowner's claim by itself | `src/disputes/tracker.ts`, `docs/paypal-notes.md` § How the tracker finds the claim | the claim screen says when you filed and for how much, and the offer screen follows PayPal's status, without you typing the claim id anywhere |
+| The demo case itself went all the way on the hosted demo | `docs/sandbox-evidence.md` § The demo case on the hosted demo: $3,700.00 paid, a $2,650.00 claim, a $1,200 offer, escalation, PayPal decides (claim `PP-R-DVT-10197552`, 9 Nov 2026) | [/cases/de35db1b41bc/money-back](https://makeitright.retailbox-automation.com/cases/de35db1b41bc/money-back): +$2,650.00 back to the homeowner |
 | The whole claim path ran on real sandbox claims | `docs/sandbox-evidence.md`: offer accepted ($460 → $300), contractor accepts ($400), offer declined and PayPal decides ($1,350 back, 12 min 9 s after filing) | claim ids and PayPal's outcomes |
 | The photo check is measured, with its limits | the table below; runner in `eval/` | 91.7 % of verdicts right on 12 held-out jobs |
 
@@ -34,6 +35,7 @@ No credentials of ours are needed. The photo check on the hosted demo replays a 
 - **What it does:** reads the estimate (PDF text, or an image of a paper estimate) and the text messages, lists the promised items with where each was promised, then judges each item from the job-site photos: done, partly done (how many units), not done, or no photo yet.
 - **What it never does:** compute money or move it. The claim is computed in code from the items and the verdicts; a contractor's words are never proof.
 - **On the hosted demo:** there is no model on the server. The demo case shows the model's recorded answer for that case (`demo/ridgeway/`), and `POST /api/cases/analyze` answers 503. To run the photo check live on your own files, see "Run it yourself".
+- **Media made with AI:** ChatGPT image generation for the screen mockups, the demo job-site photos and the video illustrations; ElevenLabs for the video voiceover, a clone of our founder's own voice.
 
 ## How PayPal is used (sandbox)
 

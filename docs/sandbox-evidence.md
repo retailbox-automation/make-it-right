@@ -1,6 +1,26 @@
 # Sandbox evidence: the claim path, end to end
 
-A live run of the PayPal layer on 3 Nov 2026, 14:01 to 14:53 UTC. PayPal **sandbox** only: test accounts and test money. Everything below went through the app's own HTTP API (`main` 25401f6, poller every 60 s) except where a row says otherwise; the homeowner's steps were done on PayPal's sandbox site. Amounts, ids and states are from PayPal's answers.
+PayPal **sandbox** only: test accounts and test money. Amounts, ids and states are from PayPal's answers; the homeowner's steps were done on PayPal's sandbox site.
+
+## The demo case on the hosted demo, 9 Nov 2026
+
+The demo case from payment to money back, on https://makeitright.retailbox-automation.com (`main` 0f20c86; the homeowner's copy of the demo case is `de35db1b41bc`). Steps marked "through the app" went through the hosted app itself. Every id below was read again from PayPal on 9 Nov 2026 at 22:02 UTC.
+
+| UTC | Step | PayPal's record |
+|---|---|---|
+| 17:15 | A sandbox buyer approves the $3,700.00 order made of the six promised items; the app captures it | order `7PK2257549221023Y` `COMPLETED`, 6 items, `custom_id` `MIR-de35db1b41bc`; capture `1C115562UL725224L` |
+| 18:33 | The homeowner files "Service not received" on PayPal's site for four items, $2,650.00 | claim `PP-R-DVT-10197552`, `MERCHANDISE_OR_SERVICE_NOT_RECEIVED`, $2,650.00, homeowner's id `3YB04350TA902450X` |
+| 18:42 | Sandbox stand-in: the contractor offers $1,200 through the app | `offer.history`: `PROPOSED` $1,200.00 at 18:42:11 |
+| 18:47 | Escalated through the app | stage `CHARGEBACK` at 18:50 |
+| 18:51 | The app asks PayPal to decide (`adjudicate`, sandbox only) | adjudication `RECOVER_FROM_SELLER` at 18:51:09, reason `INELIGIBLE_SELLER_PROTECTION_POLICY` |
+| 18:52 | Money moves | homeowner credited $2,650.00; seller debited $2,650.00 plus fees of $129.62 and $15.00 |
+| 18:53 | Resolved | `RESOLVED_BUYER_FAVOUR`, refunded $2,650.00; the capture is now `PARTIALLY_REFUNDED` |
+
+The app found the claim in PayPal's list when we pressed "Check PayPal now" on the claim screen at 18:41; whether its background poller would have found it first was not observed in this run (the 3 Nov scenes below show the poller finding claims by itself). The $1,200 offer was never paid: PayPal refunded the full claim. PayPal's offer history has no cancel event for it, so the app shows the offer as canceled by its own rule (`docs/paypal-notes.md`, mapping of `offer`). The finished case is open to anyone at `/cases/de35db1b41bc/money-back`.
+
+## 3 Nov 2026: the claim path through the app's API
+
+A live run of the PayPal layer on 3 Nov 2026, 14:01 to 14:53 UTC. Everything below went through the app's own HTTP API (`main` 25401f6, poller every 60 s) except where a row says otherwise.
 
 ## What was proved
 
@@ -72,7 +92,7 @@ The sandbox helper `POST /api/cases/:id/escalate` answered 200 and the claim rea
 
 ## Not proved yet
 
-- An open offer canceled by escalation, in PayPal's own events (the $500 claim is set up for it, waiting for the balance).
+- An open offer canceled by escalation, in PayPal's own events. On 9 Nov (hosted demo, above) an open $1,200 offer was followed by escalation and PayPal's decision: the offer was never paid and the full claim was refunded, but PayPal's offer history still shows only `PROPOSED`.
 - The contractor's evidence route, `POST /api/sim/contractor/:id/evidence`, in this run.
 
 ## After this run

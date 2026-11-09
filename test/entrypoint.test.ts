@@ -19,6 +19,8 @@ case "$1" in
   export) printf '%s' "$FAKE_EXPORT" ;;
   run) shift; flags=""; while [ "$1" != "--" ]; do flags="$flags $1"; shift; done; shift
        echo "infisical run:$flags token=$INFISICAL_TOKEN" >&2
+       echo "identity id: \${INFISICAL_UNIVERSAL_AUTH_CLIENT_ID:+set}\${INFISICAL_UNIVERSAL_AUTH_CLIENT_ID:-unset}" | sed 's/client-id-1//' >&2
+       [ -n "\${INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET:-}" ] && echo "identity secret: set" >&2 || echo "identity secret: unset" >&2
        PAYPAL_SANDBOX_CLIENT_ID=from-vault exec "$@" ;;
   *) exit 2 ;;
 esac
@@ -55,6 +57,36 @@ describe.skipIf(asRoot)('the container entrypoint', () => {
     expect(err).toContain('infisical run: --projectId=proj-1 --env=prod --path=/make-it-right token=token-from-login');
     expect(err).toContain('3 secrets at /make-it-right (env prod): MIR_PUBLIC_DEMO, PAYPAL_SANDBOX_CLIENT_ID, PAYPAL_SANDBOX_CLIENT_SECRET; starting the app');
     for (const value of [SECRET_VALUE, 'AbC-id', 'identity-secret-7c1d', 'inherited-token']) expect(err).not.toContain(value);
+  });
+
+  it('hands the app only the token: the machine identity\'s own credentials are removed before `infisical run`', () => {
+    const { code, err } = run({ ...IDENTITY, FAKE_EXPORT: GOOD });
+    expect(code).toBe(0);
+    expect(err).toContain('identity id: unset');
+    expect(err).toContain('identity secret: unset');
+    expect(err).toContain('token=token-from-login');
+  });
+
+  it.each([
+    ['an empty client secret', { PAYPAL_SANDBOX_CLIENT_ID: 'AbC-id', PAYPAL_SANDBOX_CLIENT_SECRET: '' }, /are empty: PAYPAL_SANDBOX_CLIENT_SECRET$/m],
+    ['a client id of spaces only', { PAYPAL_SANDBOX_CLIENT_ID: '   ', PAYPAL_SANDBOX_CLIENT_SECRET: SECRET_VALUE }, /are empty: PAYPAL_SANDBOX_CLIENT_ID$/m],
+    ['both empty', { PAYPAL_SANDBOX_CLIENT_ID: '', PAYPAL_SANDBOX_CLIENT_SECRET: '' }, /are empty: PAYPAL_SANDBOX_CLIENT_ID, PAYPAL_SANDBOX_CLIENT_SECRET$/m],
+  ])('refuses to start when a PayPal key is there but %s, without printing any value', (_what, secrets, message) => {
+    const { code, err, out } = run({ ...IDENTITY, FAKE_EXPORT: vault(secrets) });
+    expect(code).toBe(1);
+    expect(out).toBe('');
+    expect(err).toMatch(message);
+    expect(err).not.toContain(SECRET_VALUE);
+    expect(err).not.toContain('AbC-id');
+  });
+
+  it('refuses SECRETS_SOURCE=platform in the public demo', () => {
+    for (const flag of ['1', 'true']) {
+      const { code, err, out } = run({ SECRETS_SOURCE: 'platform', MIR_PUBLIC_DEMO: flag, PAYPAL_SANDBOX_CLIENT_ID: 'from-host' });
+      expect(code).toBe(1);
+      expect(out).toBe('');
+      expect(err).toContain('SECRETS_SOURCE=platform is for local runs');
+    }
   });
 
   it('is fail-closed by default: without SECRETS_SOURCE it still needs the vault', () => {

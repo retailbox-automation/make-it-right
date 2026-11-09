@@ -6,18 +6,19 @@
 # 2. SECRETS_SOURCE=infisical (the image's default): the secrets of this service are read from Infisical when the
 #    container starts and handed to the app by `infisical run`, for the life of the process only; nothing is written
 #    to disk. Required:
-#      INFISICAL_API_URL                       the vault's API, e.g. https://vault.example/api
+#      INFISICAL_API_URL                       the vault's API address
 #      INFISICAL_PROJECT_ID                    the vault project of this service
 #      INFISICAL_SECRET_PATH                   the folder of this service, e.g. /make-it-right
 #      INFISICAL_UNIVERSAL_AUTH_CLIENT_ID      a machine identity that can read only that folder
 #      INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET  its secret
 #    Optional: INFISICAL_ENV (default prod).
 #    The CLI reads the API address and the identity from the environment, so no credential appears on a command line.
-#    SECRETS_SOURCE=platform runs the app with the environment as it is (local runs only).
+#    SECRETS_SOURCE=platform runs the app with the environment as it is (local runs only; refused with MIR_PUBLIC_DEMO=1).
 #
 # The start stops (exit 1) on anything missing: an unset variable, a failed login, a secret set that cannot be read,
-# is empty, or lacks the PayPal sandbox credentials. There is no fallback to other values. Only variable NAMES and a
-# COUNT are ever logged, never a value.
+# is empty, or lacks the PayPal sandbox credentials or has them empty. There is no fallback to other values. Only
+# variable NAMES and a COUNT are ever logged, never a value. The machine identity's own credentials are removed from the
+# environment before the app starts: the token from the login is all `infisical run` needs.
 
 set -eu
 
@@ -42,6 +43,9 @@ SECRETS_SOURCE="${SECRETS_SOURCE:-infisical}"
 case "$SECRETS_SOURCE" in
     infisical) ;;
     platform)
+        case "${MIR_PUBLIC_DEMO:-}" in
+            1 | true) die "SECRETS_SOURCE=platform is for local runs; the public demo (MIR_PUBLIC_DEMO=${MIR_PUBLIC_DEMO}) takes its secrets from the vault" ;;
+        esac
         log "SECRETS_SOURCE=platform: the app runs with the environment as it is"
         exec "$@"
         ;;
@@ -68,8 +72,8 @@ INFISICAL_TOKEN="$(infisical login --method=universal-auth --silent --plain 2>/d
 export INFISICAL_TOKEN
 
 # What this identity sees in the folder: the export is a JSON list of {key, value, ...}. The values go straight into
-# node, which prints only the count and the names; a different shape, or a list without the PayPal sandbox
-# credentials, stops the start.
+# node, which prints only the count, the names, and the names of required credentials that are absent or empty (it
+# looks at a value's length and never prints it); a different shape stops the start.
 summary="$(
     infisical export --format=json --projectId="$INFISICAL_PROJECT_ID" --env="$INFISICAL_ENV" --path="$INFISICAL_SECRET_PATH" 2>/dev/null |
         node -e '
@@ -78,21 +82,28 @@ process.stdin.on("data", (d) => { text += d; }).on("end", () => {
   let list;
   try { list = JSON.parse(text); } catch { process.exit(2); }
   if (!Array.isArray(list)) process.exit(2);
-  const names = list.map((s) => String((s && (s.key ?? s.Key ?? s.secretKey)) ?? "")).filter((n) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(n)).sort();
+  const nameOf = (s) => String((s && (s.key ?? s.Key ?? s.secretKey)) ?? "");
+  const names = list.map(nameOf).filter((n) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(n)).sort();
   if (names.length !== list.length) process.exit(2);
-  const absent = ["PAYPAL_SANDBOX_CLIENT_ID", "PAYPAL_SANDBOX_CLIENT_SECRET"].filter((n) => !names.includes(n));
-  console.log(`${list.length}\t${names.join(", ")}\t${absent.join(", ")}`);
+  const filled = (n) => list.some((s) => { const v = nameOf(s) === n ? (s.value ?? s.Value ?? s.secretValue) : undefined; return typeof v === "string" && v.trim().length > 0; });
+  const required = ["PAYPAL_SANDBOX_CLIENT_ID", "PAYPAL_SANDBOX_CLIENT_SECRET"];
+  const absent = required.filter((n) => !names.includes(n));
+  const empty = required.filter((n) => names.includes(n) && !filled(n));
+  console.log(`${list.length}\t${names.join(", ")}\t${absent.join(", ")}\t${empty.join(", ")}`);
 });' 2>/dev/null
 )" || summary=""
 
 count="$(printf '%s' "$summary" | cut -f1)"
 names="$(printf '%s' "$summary" | cut -f2)"
 absent="$(printf '%s' "$summary" | cut -f3)"
+empty="$(printf '%s' "$summary" | cut -f4)"
 case "$count" in
     "" | *[!0-9]*) die "could not read the secrets at ${INFISICAL_SECRET_PATH} (env ${INFISICAL_ENV}): the read failed, the token was refused, or the answer had an unexpected shape" ;;
 esac
 [ "$count" -gt 0 ] || die "no secrets at ${INFISICAL_SECRET_PATH} (env ${INFISICAL_ENV}); refusing to start without them"
 [ -z "$absent" ] || die "the secrets at ${INFISICAL_SECRET_PATH} (env ${INFISICAL_ENV}) lack: ${absent}"
+[ -z "$empty" ] || die "these secrets at ${INFISICAL_SECRET_PATH} (env ${INFISICAL_ENV}) are empty: ${empty}"
 
 log "${count} secrets at ${INFISICAL_SECRET_PATH} (env ${INFISICAL_ENV}): ${names}; starting the app"
+unset INFISICAL_UNIVERSAL_AUTH_CLIENT_ID INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET
 exec infisical run --projectId="$INFISICAL_PROJECT_ID" --env="$INFISICAL_ENV" --path="$INFISICAL_SECRET_PATH" -- "$@"

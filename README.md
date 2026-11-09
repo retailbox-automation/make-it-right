@@ -13,7 +13,7 @@ Demo: **https://makeitright.retailbox-automation.com** (no login).
 1. **Open the walkthrough** to see the demo case: what Ridgeway Electric (a made-up contractor) promised, what each photo shows, and the claim the app computes. Read-only.
 2. **Start with your PayPal sandbox account** makes your own copy of the demo case. Log in with your own PayPal sandbox Personal account and approve the $3,700.00 payment (sandbox money).
 3. Back in the app, press **File with PayPal** and file "Service not received" in the sandbox Resolution Center for the amounts the claim screen shows ($2,650.00 in total).
-4. The app finds your claim within a few minutes (3 to 4 in our sandbox runs). On the offer screen, **Sandbox stand-in: contractor makes an offer**, then accept it on PayPal or press **Ask PayPal to decide**. The money-back screen shows the outcome.
+4. The app finds your claim within a few minutes (3 to 4 in our sandbox runs). On the offer screen, **Sandbox stand-in: contractor makes an offer**, then accept it on PayPal or press **Ask PayPal to decide** (the hosted demo allows 5 such sandbox refunds a day, because the sandbox seller is shared). The money-back screen shows the outcome.
 
 No credentials of ours are needed. The photo check on the hosted demo replays a recorded analysis (see below); every PayPal call is live, in the sandbox.
 
@@ -53,7 +53,7 @@ PAYPAL_SANDBOX_CLIENT_ID=... PAYPAL_SANDBOX_CLIENT_SECRET=... MIR_POLL_SECONDS=6
 # live photo check (optional): MIR_VISION_MODEL=ollama:gemma4:31b (MIR_OLLAMA_URL, MIR_NUM_CTX)
 ```
 
-Put the two sandbox credentials in the environment from your own secret store, not on the command line. Other settings: `PORT`, `MIR_DATA_DIR`, `MIR_RETURN_URL`, `MIR_CANCEL_URL`, `MIR_CALL_JOURNAL` (see `src/config.ts`). `MIR_PUBLIC_DEMO=1` turns on the hosted demo's limits: cases only from the demo template, and daily caps on new live cases (`MIR_DEMO_CASES_PER_ADDRESS_PER_DAY`, `MIR_DEMO_CASES_PER_DAY`).
+Put the two sandbox credentials in the environment from your own secret store, not on the command line. Other settings: `PORT`, `MIR_DATA_DIR`, `MIR_RETURN_URL`, `MIR_CANCEL_URL`, `MIR_CALL_JOURNAL` (see `src/config.ts`). `MIR_PUBLIC_DEMO=1` turns on the hosted demo's limits, because the sandbox seller and the PayPal app are shared: cases only from the demo template; daily caps on new live cases (`MIR_DEMO_CASES_PER_ADDRESS_PER_DAY`, default 25, `MIR_DEMO_CASES_PER_DAY`, default 60); a limit on steps that call PayPal (`MIR_DEMO_ACTIONS_PER_ADDRESS` per `MIR_DEMO_ACTIONS_WINDOW_MINUTES`, default 30 per 10 minutes); and at most `MIR_DEMO_REFUNDS_PER_DAY` (default 5) refunds a day that the app itself triggers (PayPal deciding in the sandbox, or the stand-in accepting a claim).
 
 The hosted demo runs from the `Dockerfile`: `tools/docker-entrypoint.sh` reads the service's secrets from a vault at start (`infisical run`), refuses to start without them, and runs the app as an unprivileged user.
 

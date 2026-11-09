@@ -169,7 +169,7 @@
     {
       "posted_by": "BUYER",
       "time_posted": "2026-10-31T18:29:56.922Z",
-      "content": "SANDBOX TEST (synthetic case B, CT3110-MIRB1). Paid $600 up front for 6 promised items. Items 1-2 done, items 3-6 never done, contractor stopped replying. Claiming only the 4 unfinished items, $100 each = $400.",
+      "content": "SANDBOX TEST (synthetic case B). Paid $600 up front for 6 promised items. Items 1-2 done, items 3-6 never done, contractor stopped replying. Claiming only the 4 unfinished items, $100 each = $400.",
       "documents": [
         {
           "name": "item3-fan-not-installed.png",
@@ -192,7 +192,7 @@
           "url": "https://api-m.sandbox.paypal.com/v2/content/documents/DIS-010-11f1-d559-12458e70-ac58-c9708d6937b4/files/1/download"
         }
       ],
-      "notes": "SANDBOX TEST (synthetic case B, CT3110-MIRB1). Paid $600 up front for 6 promised items. Items 1-2 done, items 3-6 never done, contractor stopped replying. Claiming only the 4 unfinished items, $100 each = $400.",
+      "notes": "SANDBOX TEST (synthetic case B). Paid $600 up front for 6 promised items. Items 1-2 done, items 3-6 never done, contractor stopped replying. Claiming only the 4 unfinished items, $100 each = $400.",
       "source": "SUBMITTED_BY_BUYER",
       "date": "2026-10-31T18:29:56.922Z",
       "dispute_life_cycle_stage": "INQUIRY"

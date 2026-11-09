@@ -216,7 +216,7 @@ describe('mutations only touch our own orders and disputes', () => {
     const { fake, client } = makeClient();
     await client.request('POST', '/v2/checkout/orders', { json: orderBody('MIR-abc') });
     expect(fake.calls).toHaveLength(1);
-    for (const bad of ['', 'LBL-1', 'mir-lower', 'xMIR-1']) {
+    for (const bad of ['', 'ABC-1', 'mir-lower', 'xMIR-1']) {
       await expect(client.request('POST', '/v2/checkout/orders', { json: orderBody(bad) })).rejects.toBeInstanceOf(RefusedRequestError);
     }
     await expect(client.request('POST', '/v2/checkout/orders', { json: { intent: 'CAPTURE', purchase_units: [] } })).rejects.toBeInstanceOf(RefusedRequestError);

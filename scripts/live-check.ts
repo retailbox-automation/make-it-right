@@ -1,6 +1,6 @@
 // Read-only checks against the PayPal SANDBOX, plus one unapproved order to prove the request shape.
-// Run it through the wrapper that injects the sandbox credentials, never with them in the command line:
-//   VAULT_EGRESS_OK=api-m.sandbox.paypal.com tools/lbl/with-sandbox-env.sh npx tsx scripts/live-check.ts <command>
+// Run it with PAYPAL_SANDBOX_CLIENT_ID and PAYPAL_SANDBOX_CLIENT_SECRET injected from your own secret store, never on the command line:
+//   npx tsx scripts/live-check.ts <command>
 // Commands: research | disputes | list | smoke-order
 // It prints statuses, ids and field names. It never prints credentials, tokens or e-mail addresses.
 import { PayPalClient, PayPalError, type JournalEntry } from '../src/paypal/client.js';

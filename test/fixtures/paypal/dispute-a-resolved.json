@@ -131,7 +131,7 @@
     {
       "posted_by": "BUYER",
       "time_posted": "2026-10-31T18:25:35.592Z",
-      "content": "SANDBOX TEST (synthetic case, CT3110-MIRB1). Paid $600 up front for 6 promised items (quote attached). Items 1-2 were done. Items 3-6 were never done and the contractor stopped replying: 3 exhaust fan (photo attached: ceiling cut-out still open), 4 shower wall tile, 5 vanity and faucet, 6 paint and trim. I am claiming only the 4 unfinished items, $100 each = $400.",
+      "content": "SANDBOX TEST (synthetic case). Paid $600 up front for 6 promised items (quote attached). Items 1-2 were done. Items 3-6 were never done and the contractor stopped replying: 3 exhaust fan (photo attached: ceiling cut-out still open), 4 shower wall tile, 5 vanity and faucet, 6 paint and trim. I am claiming only the 4 unfinished items, $100 each = $400.",
       "documents": [
         {
           "name": "item3-fan-not-installed.png",
@@ -167,7 +167,7 @@
           "url": "https://api-m.sandbox.paypal.com/v2/content/documents/DIS-010-11f1-d558-76843450-bda7-c329f462b648/files/1/download"
         }
       ],
-      "notes": "SANDBOX TEST (synthetic case, CT3110-MIRB1). Paid $600 up front for 6 promised items (quote attached). Items 1-2 were done. Items 3-6 were never done and the contractor stopped replying: 3 exhaust fan (photo attached: ceiling cut-out still open), 4 shower wall tile, 5 vanity and faucet, 6 paint and trim. I am claiming only the 4 unfinished items, $100 each = $400.",
+      "notes": "SANDBOX TEST (synthetic case). Paid $600 up front for 6 promised items (quote attached). Items 1-2 were done. Items 3-6 were never done and the contractor stopped replying: 3 exhaust fan (photo attached: ceiling cut-out still open), 4 shower wall tile, 5 vanity and faucet, 6 paint and trim. I am claiming only the 4 unfinished items, $100 each = $400.",
       "source": "SUBMITTED_BY_BUYER",
       "date": "2026-10-31T18:25:35.592Z",
       "dispute_life_cycle_stage": "INQUIRY"

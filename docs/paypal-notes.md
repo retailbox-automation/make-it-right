@@ -70,7 +70,7 @@ PayPal's own `adjudicate` answer is 400 `ACTION_NOT_ALLOWED_IN_CURRENT_DISPUTE_S
 
 `PAYPAL_SANDBOX_CLIENT_ID` and `PAYPAL_SANDBOX_CLIENT_SECRET` are required (only `src/server.ts` and `scripts/live-check.ts` read the environment). Optional: `PORT` (8787), `MIR_DATA_DIR` (`./data`), `MIR_RETURN_URL` / `MIR_CANCEL_URL` (`http://localhost:<port>/paypal/return|cancel`), `MIR_POLL_SECONDS`, `MIR_CALL_JOURNAL` (a file path). `npm run dev` / `npm run start`.
 
-Live checks, through the wrapper that injects the secrets: `VAULT_EGRESS_OK=api-m.sandbox.paypal.com tools/lbl/with-sandbox-env.sh npx tsx scripts/live-check.ts research | disputes | list | smoke-order`.
+Live checks, with the two sandbox credentials in the environment (inject them from your own secret store, never on the command line): `npx tsx scripts/live-check.ts research | disputes | list | smoke-order`.
 
 ## Live checks of 1 Nov 2026
 

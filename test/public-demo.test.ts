@@ -18,21 +18,27 @@ let now: Date;
 /** The public demo's limits with their defaults (src/config.ts) */
 const LIMITS = { perAddressPerDay: 25, perDay: 60, actionsPerAddress: 30, actionsWindowMinutes: 10, refundsPerDay: 5 };
 
+function makeService(refunds?: RefundCap): CaseService {
+  const locks = new KeyedLock();
+  let n = 0;
+  return new CaseService({
+    store: world.store, paypal: world.client, tracker: new Tracker({ store: world.store, paypal: world.client, locks }), locks,
+    now: () => now, newId: () => `copy${++n}`,
+    urls: { returnUrl: 'https://demo.example/paypal/return', cancelUrl: 'https://demo.example/paypal/cancel' },
+    ...(refunds ? { refunds } : {}),
+  });
+}
+
+/** The public demo runs on a case service with the daily refund cap, as src/server.ts builds it */
 function build(options: Partial<AppOptions> = {}): Hono {
-  const refunds = options.publicDemo ? { refunds: new RefundCap(world.store, options.publicDemo.refundsPerDay, () => now) } : {};
-  return createApp(service, { log: () => undefined, demo, trustForwardedFor: true, now: () => now, ...refunds, ...options });
+  const cases = options.publicDemo ? makeService(new RefundCap(world.store, options.publicDemo.refundsPerDay, () => now)) : service;
+  return createApp(cases, { log: () => undefined, demo, trustForwardedFor: true, now: () => now, ...options });
 }
 
 beforeEach(async () => {
   now = new Date('2026-11-09T15:00:00.000Z');
   world = makeWorld();
-  const locks = new KeyedLock();
-  let n = 0;
-  service = new CaseService({
-    store: world.store, paypal: world.client, tracker: new Tracker({ store: world.store, paypal: world.client, locks }), locks,
-    now: () => now, newId: () => `copy${++n}`,
-    urls: { returnUrl: 'https://demo.example/paypal/return', cancelUrl: 'https://demo.example/paypal/cancel' },
-  });
+  service = makeService();
   await seedWalkthrough(service, demo);
 });
 
@@ -183,7 +189,7 @@ describe('limits on PayPal steps in the public demo', () => {
 
       const over = await send(app, `/api/cases/${inquiry}/adjudicate`, { method: 'POST', headers: from('k9'), body: { outcome: 'BUYER_FAVOR' } });
       expect(over.status).toBe(429);
-      expect((await json(over)).error).toEqual({ code: 'DEMO_REFUND_LIMIT', message: expect.stringMatching(/made its 5 refunds for today/) });
+      expect((await json(over)).error).toEqual({ code: 'DEMO_REFUND_LIMIT', message: expect.stringMatching(/used its 5 refunds for today \(each offer from the contractor, accepted claim or decision for the homeowner counts as one\)/) });
       expect(over.headers.get('retry-after')).toBe(String(9 * 3600));
       expect((await send(app, `/api/sim/contractor/${inquiry}/accept-claim`, { method: 'POST', headers: from('k10') })).status).toBe(429);
       expect(refundCalls()).toBe(5);
@@ -212,8 +218,46 @@ describe('limits on PayPal steps in the public demo', () => {
       expect(refundCalls()).toBe(3);
     });
 
+    it('counts the stand-in\'s offer: the homeowner accepts it on PayPal\'s site, where the app cannot see it', async () => {
+      const app = build({ publicDemo: { ...LIMITS, refundsPerDay: 1 } });
+      const id = await paidCopy(app, {});
+      expect((await send(app, `/api/sim/contractor/${id}/offer`, { method: 'POST', headers: from('o1') })).status).toBe(200);
+      const again = await send(app, `/api/sim/contractor/${id}/offer`, { method: 'POST', headers: from('o2') });
+      expect(again.status).toBe(429);
+      expect((await json(again)).error.code).toBe('DEMO_REFUND_LIMIT');
+      expect(world.fake.calls.filter((c) => c.path.endsWith('/make-offer'))).toHaveLength(1);
+    });
+
+    it('takes no place for a decision in the contractor\'s favour, only for the homeowner\'s', async () => {
+      const app = build({ publicDemo: { ...LIMITS, refundsPerDay: 1 } });
+      const id = await paidCopy(app, { dispute_life_cycle_stage: 'CHARGEBACK', status: 'UNDER_REVIEW' });
+      const decide = (outcome: string, who: string) => send(app, `/api/cases/${id}/adjudicate`, { method: 'POST', headers: from(who), body: { outcome } });
+      expect((await decide('SELLER_FAVOR', 's1')).status).toBe(200);
+      expect((await decide('SELLER_FAVOR', 's2')).status).toBe(200);
+      expect((await decide('BUYER_FAVOR', 'b1')).status).toBe(200);
+      expect((await decide('BUYER_FAVOR', 'b2')).status).toBe(429);
+      expect((await decide('SELLER_FAVOR', 's3')).status).toBe(200);
+    });
+
+    it('takes no place when the claim look-up fails, even when PayPal does not answer it', async () => {
+      const app = build({ publicDemo: { ...LIMITS, refundsPerDay: 1 } });
+      const id = await paidCopy(app, {});
+      expect((await send(app, `/api/cases/${id}/dispute`, { headers: from('look') })).status).toBe(200); // the claim is stored
+      const open = world.dispute!;
+      // the look-up's answer cannot be sent: to the app, PayPal did not answer (502)
+      world.dispute = { ...open, toJSON: () => { throw new Error('connection reset'); } };
+      now = new Date(now.getTime() + 16_000);
+      const failed = await send(app, `/api/sim/contractor/${id}/accept-claim`, { method: 'POST', headers: from('f1') });
+      expect(failed.status).toBe(502);
+      expect((await json(failed)).error.code).toBe('PAYPAL_UNAVAILABLE');
+      expect(refundCalls()).toBe(0);
+      world.dispute = open;
+      expect((await send(app, `/api/sim/contractor/${id}/accept-claim`, { method: 'POST', headers: from('f2') })).status).toBe(200);
+      expect((await send(app, `/api/sim/contractor/${id}/accept-claim`, { method: 'POST', headers: from('f3') })).status).toBe(429);
+    });
+
     it('is not needed outside the public demo, and the public demo refuses to run without it', () => {
-      expect(() => createApp(service, { log: () => undefined, demo, publicDemo: LIMITS })).toThrow(/needs the daily refund cap/);
+      expect(() => createApp(service, { log: () => undefined, demo, publicDemo: LIMITS })).toThrow(/needs the daily refund cap in the case service/);
       expect(() => createApp(service, { log: () => undefined, demo })).not.toThrow();
     });
   });
@@ -240,14 +284,36 @@ describe('limits on PayPal steps in the public demo', () => {
       expect((await send(app, `/api/cases/${id}/dispute`, { headers: from('x') })).status).toBe(200);
     });
 
-    it('counts a route however it is spelled', () => {
+    it('counts a route however it is spelled, HEAD like GET', () => {
       for (const [method, path] of [
         ['POST', '/api/cases/abc/escalate'], ['POST', '/api/cases/abc/escalate/'], ['POST', '/api/cases/abc/ADJUDICATE'], ['POST', '/API/cases/abc/payment'],
         ['POST', '/api/sim/contractor/abc/offer'], ['POST', '/api/SIM/contractor/abc/accept-claim/'], ['GET', '/api/cases/abc/dispute'], ['GET', '/api/cases/abc/dispute//'],
+        ['HEAD', '/api/cases/abc/dispute'], ['GET', '/paypal/return'], ['HEAD', '/paypal/return'], ['GET', '/PayPal/Return/'],
       ] as const) expect(callsPayPal(method, path), `${method} ${path}`).toBe(true);
-      for (const [method, path] of [['GET', '/api/cases/abc'], ['POST', '/api/cases'], ['POST', '/api/demo/cases'], ['POST', '/api/cases/analyze'], ['GET', '/api/cases/abc/photos/photo-1.png']] as const) {
+      for (const [method, path] of [['GET', '/api/cases/abc'], ['HEAD', '/api/cases/abc'], ['POST', '/api/cases'], ['POST', '/api/demo/cases'], ['POST', '/api/cases/analyze'], ['GET', '/api/cases/abc/photos/photo-1.png'], ['GET', '/paypal/cancel'], ['OPTIONS', '/api/cases/abc/dispute']] as const) {
         expect(callsPayPal(method, path), `${method} ${path}`).toBe(false);
       }
+    });
+
+    it('counts HEAD on the claim look-up like GET (it runs the same handler)', async () => {
+      const app = build({ publicDemo: { ...LIMITS, actionsPerAddress: 2 } });
+      const id = await paidCopy(app);
+      expect((await send(app, `/api/cases/${id}/dispute`, { method: 'HEAD', headers: from('h') })).status).toBe(200);
+      expect((await send(app, `/api/cases/${id}/dispute`, { method: 'HEAD', headers: from('h') })).status).toBe(200);
+      expect((await send(app, `/api/cases/${id}/dispute`, { method: 'HEAD', headers: from('h') })).status).toBe(429);
+      expect((await send(app, `/api/cases/${id}/dispute`, { headers: from('h') })).status).toBe(429);
+    });
+
+    it('counts the way back from PayPal (it takes the money), and answers a page when the address is over its limit', async () => {
+      const app = build({ publicDemo: { ...LIMITS, actionsPerAddress: 1 } });
+      expect((await send(app, '/paypal/return?token=NOSUCHORDER1', { headers: from('r') })).status).toBe(404);
+      const over = await send(app, '/paypal/return?token=NOSUCHORDER1', { headers: from('r') });
+      expect(over.status).toBe(429);
+      expect(over.headers.get('content-type')).toBe('text/html; charset=utf-8');
+      expect(await over.text()).toContain('Too many PayPal steps from this address');
+      expect((await send(app, '/paypal/return?token=NOSUCHORDER1', { method: 'HEAD', headers: from('r') })).status).toBe(429);
+      expect((await send(app, '/paypal/cancel', { headers: from('r') })).status).toBe(200); // cancel asks PayPal nothing
+      expect((await send(app, '/paypal/return?token=NOSUCHORDER1', { headers: from('other') })).status).toBe(404);
     });
 
     it('lets no spelling of POST /api/cases make a case from JSON', async () => {

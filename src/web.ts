@@ -109,9 +109,11 @@ nav a:first-child { background: var(--graphite); color: #F6F2EA; }
 
 const HOME: Link = { href: '/', text: 'Start page' };
 
-function notice(status: 200 | HttpError['status'], title: string, message: string, links: Link[]): Response {
+/** A notice page as an HTTP answer */
+export function noticeResponse(status: 200 | HttpError['status'], title: string, message: string, links: Link[]): Response {
   return new Response(noticePage(title, message, links), { status, headers: { ...PAGE_HEADERS, 'content-type': TYPES.html! } });
 }
+const notice = noticeResponse;
 
 export function registerWeb(app: Hono, deps: { service: CaseService; log: (message: string) => void }): void {
   const { service, log } = deps;

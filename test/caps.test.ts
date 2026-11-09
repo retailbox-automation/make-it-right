@@ -91,6 +91,50 @@ describe('PayPal steps per address in a window', () => {
   });
 });
 
+describe('the per-address limit keeps a bounded number of addresses', () => {
+  it('refuses a new address with 429 once the ceiling is reached, and makes room as the oldest windows close', () => {
+    let now = 0;
+    const limit = new WindowLimit({ limit: 5, windowMs: 60_000, maxAddresses: 3, now: () => now });
+    limit.take('a');
+    now = 10_000;
+    limit.take('b');
+    limit.take('c');
+    const full = refused(() => limit.take('d'));
+    expect(full).toMatchObject({ status: 429, code: 'TOO_MANY_PAYPAL_STEPS' });
+    expect(full.message).toMatch(/The demo is busy right now/);
+    expect(full.headers['retry-after']).toBe('50'); // when the oldest window, a's, closes
+    expect(() => limit.take('a')).not.toThrow(); // known addresses go on
+    now = 60_000; // a's window has closed: one place is free
+    expect(() => limit.take('d')).not.toThrow();
+    expect(limit.tracked).toBe(3);
+    expect(() => limit.take('e')).toThrow(/busy/);
+  });
+
+  it('drops closed windows from the front without growing past the ceiling under many addresses', () => {
+    let now = 0;
+    const limit = new WindowLimit({ limit: 1, windowMs: 1_000, now: () => now });
+    for (let i = 0; i < 10_000; i += 1) limit.take(`10.0.${Math.floor(i / 256)}.${i % 256}`);
+    expect(limit.tracked).toBe(10_000);
+    expect(() => limit.take('spoofed-1')).toThrow(/busy/);
+    now = 1_000;
+    limit.take('later');
+    expect(limit.tracked).toBe(1);
+  });
+
+  it('starts a new window for an address whose window closed, even when it was not the oldest', () => {
+    let now = 0;
+    const limit = new WindowLimit({ limit: 1, windowMs: 1_000, now: () => now });
+    limit.take('a');
+    now = 500;
+    limit.take('b');
+    now = 1_000;
+    expect(() => limit.take('a')).not.toThrow();
+    expect(() => limit.take('b')).toThrow(/Too many PayPal steps/);
+    now = 1_500;
+    expect(() => limit.take('b')).not.toThrow();
+  });
+});
+
 describe('the daily refund cap', () => {
   const dirs: string[] = [];
   afterAll(() => {

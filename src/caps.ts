@@ -64,42 +64,66 @@ export interface WindowLimitOptions {
   /** Requests one address may make in a window */
   limit: number;
   windowMs: number;
+  /** Addresses tracked at most; when that many have open windows, a new address is refused until the oldest window closes */
+  maxAddresses?: number;
   now?: () => number;
 }
 
-/** Addresses remembered at most before the ones whose window has passed are forgotten */
-const MAX_WINDOWS = 5000;
+export const MAX_TRACKED_ADDRESSES = 10_000;
 
-/** So many requests per client address in a fixed time window (the steps that call PayPal) */
+/**
+ * So many requests per client address in a fixed time window (the steps that call PayPal). Windows are kept in the order
+ * they opened, so the closed ones are dropped from the front without looking at the rest; at most `maxAddresses` are kept.
+ */
 export class WindowLimit {
   private readonly seen = new Map<string, { start: number; count: number }>();
   private readonly now: () => number;
+  private readonly maxAddresses: number;
 
   constructor(private readonly options: WindowLimitOptions) {
     this.now = options.now ?? Date.now;
+    this.maxAddresses = options.maxAddresses ?? MAX_TRACKED_ADDRESSES;
   }
 
   /** Counts one request, or throws a 429 that says when to come back */
   take(address: string): void {
     const now = this.now();
-    const found = this.seen.get(address);
-    const entry = found && now - found.start < this.options.windowMs ? found : { start: now, count: 0 };
-    if (entry.count >= this.options.limit) {
-      const seconds = Math.max(1, Math.ceil((entry.start + this.options.windowMs - now) / 1000));
-      throw new HttpError(429, 'TOO_MANY_PAYPAL_STEPS', `Too many PayPal steps from this address; please wait ${Math.ceil(seconds / 60)} minute(s) and try again.`, { 'retry-after': String(seconds) });
+    const { windowMs, limit } = this.options;
+    for (const [key, value] of this.seen) {
+      if (now - value.start < windowMs) break; // the rest opened later
+      this.seen.delete(key);
+    }
+    let entry = this.seen.get(address);
+    if (!entry) {
+      if (this.seen.size >= this.maxAddresses) {
+        const oldest = this.seen.values().next().value!;
+        throw this.tooMany(oldest.start + windowMs - now, 'The demo is busy right now; please try again in a few minutes.');
+      }
+      entry = { start: now, count: 0 };
+      this.seen.set(address, entry); // a new window goes to the end, keeping the order of opening
+    }
+    if (entry.count >= limit) {
+      const seconds = Math.max(1, Math.ceil((entry.start + windowMs - now) / 1000));
+      throw this.tooMany(entry.start + windowMs - now, `Too many PayPal steps from this address; please wait ${Math.ceil(seconds / 60)} minute(s) and try again.`);
     }
     entry.count += 1;
-    this.seen.set(address, entry);
-    if (this.seen.size > MAX_WINDOWS) {
-      for (const [key, value] of this.seen) if (now - value.start >= this.options.windowMs) this.seen.delete(key);
-    }
+  }
+
+  /** Addresses with an open window now */
+  get tracked(): number {
+    return this.seen.size;
+  }
+
+  private tooMany(ms: number, message: string): HttpError {
+    return new HttpError(429, 'TOO_MANY_PAYPAL_STEPS', message, { 'retry-after': String(Math.max(1, Math.ceil(ms / 1000))) });
   }
 }
 
 const REFUND_KEY = 'demo-refund';
 
 /**
- * Refunds the app itself sets off (PayPal deciding a claim, the contractor stand-in accepting one) come out of the shared
+ * Refunds the app itself sets off (PayPal deciding a claim for the homeowner, the contractor stand-in accepting one, or its
+ * offer, which the homeowner accepts on PayPal's site where the app cannot see it) come out of the shared
  * sandbox contractor's balance, so the public demo allows only so many per UTC day, for everyone together. The count is
  * kept in the database, so a restart does not reset it. A place is taken before PayPal is asked, so callers at the same
  * moment cannot pass the cap together, and given back when PayPal refused the step.
@@ -119,7 +143,7 @@ export class RefundCap {
     const day = this.now().toISOString().slice(0, 10);
     const id = await this.places.takeDailyPlace(REFUND_KEY, day, this.perDay, `${action} ${caseId}`);
     if (id === null) {
-      throw new HttpError(429, 'DEMO_REFUND_LIMIT', `The demo has made its ${this.perDay} refunds for today; please try again tomorrow (the count starts again at midnight UTC).`, {
+      throw new HttpError(429, 'DEMO_REFUND_LIMIT', `The demo has used its ${this.perDay} refunds for today (each offer from the contractor, accepted claim or decision for the homeowner counts as one); please try again tomorrow (the count starts again at midnight UTC).`, {
         'retry-after': String(secondsToMidnight(this.now())),
       });
     }

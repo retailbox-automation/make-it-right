@@ -57,8 +57,9 @@ export async function start(env: Record<string, string | undefined> = process.en
     const tracker = new Tracker({ store, paypal, locks, log });
     const service = new CaseService({
       store, paypal, tracker, locks, urls: { returnUrl: config.returnUrl, cancelUrl: config.cancelUrl }, log,
-      // In the public demo repeated clicks before the claim is filed do not each ask PayPal for the list of claims
-      ...(config.publicDemo ? { noClaimMemoryMs: NO_CLAIM_MEMORY_MS } : {}),
+      // In the public demo repeated clicks before the claim is filed do not each ask PayPal for the list of claims,
+      // and steps that can refund the homeowner from the shared sandbox contractor are capped per day
+      ...(config.publicDemo ? { noClaimMemoryMs: NO_CLAIM_MEMORY_MS, refunds: new RefundCap(store, config.publicDemo.refundsPerDay) } : {}),
     });
     const vision = config.vision;
     const model = vision
@@ -84,7 +85,7 @@ export async function start(env: Record<string, string | undefined> = process.en
       demo,
       trustForwardedFor: config.trustForwardedFor,
       ...(model ? { model } : {}),
-      ...(demoLimits ? { publicDemo: demoLimits, refunds: new RefundCap(openStore, demoLimits.refundsPerDay) } : {}),
+      ...(demoLimits ? { publicDemo: demoLimits } : {}),
     });
 
     poller = config.pollSeconds

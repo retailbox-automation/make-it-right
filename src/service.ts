@@ -31,6 +31,13 @@ export interface ServiceDeps {
   log?: (message: string) => void;
   /** How long a paid case's "no claim filed yet" is remembered before PayPal is asked again; 0 (the default) = not remembered */
   noClaimMemoryMs?: number;
+  /** The public demo's daily cap on steps that can refund the homeowner from the shared sandbox contractor (src/caps.ts RefundCap) */
+  refunds?: RefundPlaces;
+}
+
+export interface RefundPlaces {
+  /** One of the day's places, or a 429 when they are all taken */
+  take(caseId: string, action: string): Promise<{ giveBack(): Promise<void> }>;
 }
 
 export interface CaseView {
@@ -342,7 +349,9 @@ export class CaseService {
     if (record.dispute!.life_cycle_stage === 'CHARGEBACK' && record.dispute!.status === 'WAITING_FOR_SELLER_RESPONSE') {
       throw conflict('CONTRACTOR_MUST_ANSWER_FIRST', 'The contractor has to answer PayPal first');
     }
-    await viaPayPal(adjudicate(this.deps.paypal, record.dispute!.id, outcome));
+    const decide = () => adjudicate(this.deps.paypal, record.dispute!.id, outcome);
+    // Only a decision for the homeowner moves money out of the contractor's balance
+    await (outcome === 'BUYER_FAVOR' ? this.refundStep(id, 'adjudicate', decide) : viaPayPal(decide()));
     return { sandbox_only: true, action: 'adjudicate', adjudication: outcome, ...stateOf(await this.refresh(id, 'adjudicate')) };
   }
 
@@ -351,13 +360,14 @@ export class CaseService {
     if (cents < 1) throw invalid('amount must be more than zero');
     const record = await this.withClaim(id);
     if (cents > toCents(record.dispute!.original_claim_amount)) throw invalid(`amount cannot be more than the claim ($${record.dispute!.original_claim_amount})`);
-    const sim = await viaPayPal(contractorMakesOffer(this.deps.paypal, record.dispute!.id, { amount: body.amount as string }));
+    // The homeowner accepts an offer on PayPal's own site, which the app never sees, so the offer itself takes the refund place
+    const sim = await this.refundStep(id, 'offer', () => contractorMakesOffer(this.deps.paypal, record.dispute!.id, { amount: body.amount as string }));
     return { ...sim, ...stateOf(await this.refresh(id, sim.action)) };
   }
 
   async contractorAcceptClaim(id: string): Promise<SandboxAnswer> {
     const record = await this.withClaim(id);
-    const sim = await viaPayPal(contractorAcceptsClaim(this.deps.paypal, record.dispute!.id, {}));
+    const sim = await this.refundStep(id, 'accept-claim', () => contractorAcceptsClaim(this.deps.paypal, record.dispute!.id, {}));
     return { ...sim, ...stateOf(await this.refresh(id, sim.action)) };
   }
 
@@ -367,6 +377,28 @@ export class CaseService {
     const record = await this.withClaim(id);
     const sim = await viaPayPal(contractorProvidesEvidence(this.deps.paypal, record.dispute!.id, { note }));
     return { ...sim, ...stateOf(await this.refresh(id, sim.action)) };
+  }
+
+  /** True when steps that can refund the homeowner are capped (the public demo needs this) */
+  get capsRefunds(): boolean {
+    return this.deps.refunds !== undefined;
+  }
+
+  /**
+   * A PayPal step that can refund the homeowner from the shared sandbox contractor's balance. With a cap, it takes one of
+   * the day's places first: callers reach this only after the claim was read, so a failed look-up never takes a place.
+   * PayPal refusing the step gives the place back; PayPal not answering keeps it, since PayPal may have acted.
+   */
+  private async refundStep<T>(id: string, action: string, run: () => Promise<T>): Promise<T> {
+    const place = this.deps.refunds ? await this.deps.refunds.take(id, action) : null;
+    try {
+      return await viaPayPal(run());
+    } catch (error) {
+      if (place && !(error instanceof HttpError && error.code === 'PAYPAL_UNAVAILABLE')) {
+        await place.giveBack().catch((giveBackError) => this.log(`could not give back a refund place: ${giveBackError instanceof Error ? giveBackError.message : String(giveBackError)}`));
+      }
+      throw error;
+    }
   }
 
   private async mustGet(id: string): Promise<CaseRecord> {

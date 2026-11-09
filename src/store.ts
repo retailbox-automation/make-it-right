@@ -2,7 +2,15 @@
 import { PGlite } from '@electric-sql/pglite';
 import type { CaseRecord } from './model.js';
 
-export interface Store {
+/** Places counted per key and day, kept with the cases so a restart does not reset them (the public demo's refund cap) */
+export interface DailyPlaces {
+  /** Takes one of `limit` places of `key` on `day`, or answers null when all are taken. One answer at a time: two callers never get the last place. */
+  takeDailyPlace(key: string, day: string, limit: number, note: string): Promise<number | null>;
+  /** Gives back a place taken with takeDailyPlace */
+  releaseDailyPlace(id: number): Promise<void>;
+}
+
+export interface Store extends DailyPlaces {
   get(id: string): Promise<CaseRecord | undefined>;
   /** Insert or replace */
   put(record: CaseRecord): Promise<void>;
@@ -20,6 +28,8 @@ export interface Store {
 /** For tests. Copies on the way in and out, like a database does. */
 export class MemoryStore implements Store {
   private readonly cases = new Map<string, CaseRecord>();
+  private readonly places: Array<{ id: number; key: string; day: string }> = [];
+  private lastPlace = 0;
 
   async get(id: string): Promise<CaseRecord | undefined> {
     const found = this.cases.get(id);
@@ -46,6 +56,18 @@ export class MemoryStore implements Store {
     return [...this.cases.values()].some((c) => c.dispute?.id === disputeId);
   }
 
+  async takeDailyPlace(key: string, day: string, limit: number): Promise<number | null> {
+    if (this.places.filter((p) => p.key === key && p.day === day).length >= limit) return null;
+    const id = ++this.lastPlace;
+    this.places.push({ id, key, day });
+    return id;
+  }
+
+  async releaseDailyPlace(id: number): Promise<void> {
+    const at = this.places.findIndex((p) => p.id === id);
+    if (at >= 0) this.places.splice(at, 1);
+  }
+
   async close(): Promise<void> {}
 }
 
@@ -61,7 +83,15 @@ export class PgliteStore implements Store {
       updated_at timestamptz
     );
     create index if not exists cases_order_id on cases ((data->'payment'->>'order_id'));
-    create index if not exists cases_dispute_id on cases ((data->'dispute'->>'id'))`);
+    create index if not exists cases_dispute_id on cases ((data->'dispute'->>'id'));
+    create table if not exists daily_places (
+      id serial primary key,
+      key text not null,
+      day text not null,
+      note text not null,
+      taken_at timestamptz not null default now()
+    );
+    create index if not exists daily_places_key_day on daily_places (key, day)`);
     return new PgliteStore(db);
   }
 
@@ -96,6 +126,21 @@ export class PgliteStore implements Store {
   async hasDispute(disputeId: string): Promise<boolean> {
     const result = await this.db.query(`select 1 from cases where data->'dispute'->>'id' = $1 limit 1`, [disputeId]);
     return result.rows.length > 0;
+  }
+
+  async takeDailyPlace(key: string, day: string, limit: number, note: string): Promise<number | null> {
+    // One statement: the count and the insert cannot be split by another caller
+    const result = await this.db.query<{ id: number }>(
+      `insert into daily_places (key, day, note)
+       select $1, $2, $3 where (select count(*) from daily_places where key = $1 and day = $2) < $4
+       returning id`,
+      [key, day, note, limit],
+    );
+    return result.rows[0]?.id ?? null;
+  }
+
+  async releaseDailyPlace(id: number): Promise<void> {
+    await this.db.query('delete from daily_places where id = $1', [id]);
   }
 
   async close(): Promise<void> {

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { serve } from '@hono/node-server';
 import { createApp } from './app.js';
+import { RefundCap } from './caps.js';
 import { loadConfig } from './config.js';
 import { loadDemo, seedWalkthrough, WALKTHROUGH_ID, type DemoTemplate } from './demo.js';
 import { Tracker, startPoller } from './disputes/tracker.js';
@@ -14,6 +15,9 @@ import { PayPalClient } from './paypal/client.js';
 import { CaseService } from './service.js';
 import { PgliteStore } from './store.js';
 import { UploadStore } from './uploads.js';
+
+/** How long "no claim filed yet" is remembered per case in the public demo */
+export const NO_CLAIM_MEMORY_MS = 30_000;
 
 export interface RunningServer {
   port: number;
@@ -51,7 +55,11 @@ export async function start(env: Record<string, string | undefined> = process.en
       ...(journal ? { journal: (entry) => journal.write(entry) } : {}),
     });
     const tracker = new Tracker({ store, paypal, locks, log });
-    const service = new CaseService({ store, paypal, tracker, locks, urls: { returnUrl: config.returnUrl, cancelUrl: config.cancelUrl }, log });
+    const service = new CaseService({
+      store, paypal, tracker, locks, urls: { returnUrl: config.returnUrl, cancelUrl: config.cancelUrl }, log,
+      // In the public demo repeated clicks before the claim is filed do not each ask PayPal for the list of claims
+      ...(config.publicDemo ? { noClaimMemoryMs: NO_CLAIM_MEMORY_MS } : {}),
+    });
     const vision = config.vision;
     const model = vision
       ? new OllamaVisionModel({ model: vision.model, baseUrl: vision.baseUrl, numCtx: vision.numCtx, ...(deps.modelFetch ? { fetch: deps.modelFetch } : {}) })
@@ -63,14 +71,20 @@ export async function start(env: Record<string, string | undefined> = process.en
     if (removed.length) log(`removed leftover upload directories: ${removed.join(', ')}`);
     const seeded = await seedWalkthrough(service, demo);
     log(`walkthrough case ${WALKTHROUGH_ID}: ${seeded.changed ? 'stored' : 'unchanged'}`);
-    if (config.publicDemo) log(`public demo: new demo cases at most ${config.publicDemo.perAddressPerDay} per address and ${config.publicDemo.perDay} in all per day`);
+    const demoLimits = config.publicDemo;
+    if (demoLimits) {
+      log(
+        `public demo: new demo cases at most ${demoLimits.perAddressPerDay} per address and ${demoLimits.perDay} in all per day; ` +
+          `${demoLimits.actionsPerAddress} PayPal steps per address per ${demoLimits.actionsWindowMinutes} minutes; ${demoLimits.refundsPerDay} refunds per day`,
+      );
+    }
     const app = createApp(service, {
       log,
       uploads,
       demo,
       trustForwardedFor: config.trustForwardedFor,
       ...(model ? { model } : {}),
-      ...(config.publicDemo ? { publicDemo: config.publicDemo } : {}),
+      ...(demoLimits ? { publicDemo: demoLimits, refunds: new RefundCap(openStore, demoLimits.refundsPerDay) } : {}),
     });
 
     poller = config.pollSeconds

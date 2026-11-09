@@ -1,7 +1,7 @@
 // The HTTP API the screens call. JSON in, JSON out (photos and the estimate come back as the files they are); every error is {error: {code, message}}.
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
-import { DailyCaps } from './caps.js';
+import { DailyCaps, WindowLimit, type RefundCap } from './caps.js';
 import type { PublicDemoConfig } from './config.js';
 import { createDemoCopy, standInOfferAmount, type DemoTemplate } from './demo.js';
 import { HttpError, invalid, notFound } from './errors.js';
@@ -34,8 +34,20 @@ export interface AppOptions {
   demo?: DemoTemplate;
   /** The hosted demo: cases only from the demo template, within daily caps, and no photo check. Off unless given. */
   publicDemo?: PublicDemoConfig;
-  /** The clock of the daily caps; tests set it */
+  /** The daily cap on refunds the app sets off; required with publicDemo (it is kept in the database, see src/caps.ts) */
+  refunds?: RefundCap;
+  /** The clock of the daily caps and the per-address limit; tests set it */
   now?: () => Date;
+}
+
+/**
+ * The requests that make the server call PayPal: every POST on a case or on the sandbox stand-in, and the claim look-up.
+ * The path is compared in lower case and without a trailing slash, so no spelling of a route escapes the limit.
+ */
+export function callsPayPal(method: string, path: string): boolean {
+  const p = path.toLowerCase().replace(/\/+$/, '');
+  if (method === 'POST') return /^\/api\/cases\/[^/]+\/[^/]+$/.test(p) || p.startsWith('/api/sim/');
+  return method === 'GET' && /^\/api\/cases\/[^/]+\/dispute$/.test(p);
 }
 
 const PUBLIC_ANALYZE_MESSAGE =
@@ -73,6 +85,31 @@ export function createApp(service: CaseService, options: AppOptions = {}): Hono 
   const gate = options.gate ?? new PhotoCheckGate();
   const publicDemo = options.publicDemo ?? null;
   const caps = publicDemo ? new DailyCaps({ ...publicDemo, ...(options.now ? { now: options.now } : {}) }) : null;
+  const now = options.now;
+  const steps = publicDemo
+    ? new WindowLimit({ limit: publicDemo.actionsPerAddress, windowMs: publicDemo.actionsWindowMinutes * 60_000, ...(now ? { now: () => now().getTime() } : {}) })
+    : null;
+  if (publicDemo && !options.refunds) throw new Error('the public demo needs the daily refund cap (options.refunds)');
+  const refunds = publicDemo ? (options.refunds ?? null) : null;
+
+  /**
+   * A step that makes PayPal refund the homeowner from the shared sandbox contractor's balance. In the public demo it takes
+   * one of the day's refund places first and gives it back when PayPal refused the step; a PayPal that did not answer may
+   * still have acted, so that place stays taken. A judge accepting the contractor's offer on PayPal's own site also moves
+   * money from that balance; the app is not asked for that step and cannot cap it.
+   */
+  async function refundStep<T>(id: string, action: string, run: () => Promise<T>): Promise<T> {
+    if (!refunds) return run();
+    const place = await refunds.take(id, action);
+    try {
+      return await run();
+    } catch (error) {
+      if (!(error instanceof HttpError && error.code === 'PAYPAL_UNAVAILABLE')) {
+        await place.giveBack().catch((giveBackError) => log(`could not give back a refund place: ${giveBackError instanceof Error ? giveBackError.message : String(giveBackError)}`));
+      }
+      throw error;
+    }
+  }
   const clientOf = (c: Context): string => {
     const forwarded = options.trustForwardedFor ? c.req.header('x-forwarded-for')?.split(',').at(-1)?.trim() : undefined;
     return forwarded || (c.env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined)?.incoming?.socket?.remoteAddress || 'unknown';
@@ -90,6 +127,11 @@ export function createApp(service: CaseService, options: AppOptions = {}): Hono 
     } finally {
       leave();
     }
+  });
+  // Before any body is read: in the public demo each address may take only so many PayPal steps in a while
+  app.use('/api/*', async (c, next) => {
+    if (steps && callsPayPal(c.req.method, c.req.path)) steps.take(clientOf(c));
+    return next();
   });
   app.use('/api/*', (c, next) => (isAnalyze(c.req.method, c.req.path) ? large(c, next) : small(c, next)));
 
@@ -128,8 +170,9 @@ export function createApp(service: CaseService, options: AppOptions = {}): Hono 
   app.get('/api/cases/:id/dispute', async (c) => c.json(await service.getDispute(c.req.param('id'))));
   app.post('/api/cases/:id/escalate', async (c) => c.json(await service.escalate(c.req.param('id'))));
   app.post('/api/cases/:id/adjudicate', async (c) => {
+    const id = c.req.param('id');
     const input = (await body(c.req.raw)) as { outcome?: unknown } | undefined;
-    return c.json(await service.adjudicate(c.req.param('id'), input?.outcome));
+    return c.json(await refundStep(id, 'adjudicate', () => service.adjudicate(id, input?.outcome)));
   });
   app.post('/api/sim/contractor/:id/offer', async (c) => {
     const id = c.req.param('id');
@@ -139,7 +182,10 @@ export function createApp(service: CaseService, options: AppOptions = {}): Hono 
     return c.json(await service.contractorOffer(id, { amount: standInOfferAmount({ publicDemo: publicDemo !== null, template, requested }) }));
   });
   app.post('/api/sim/contractor/:id/evidence', async (c) => c.json(await service.contractorEvidence(c.req.param('id'), ((await body(c.req.raw)) ?? {}) as { note?: unknown })));
-  app.post('/api/sim/contractor/:id/accept-claim', async (c) => c.json(await service.contractorAcceptClaim(c.req.param('id'))));
+  app.post('/api/sim/contractor/:id/accept-claim', async (c) => {
+    const id = c.req.param('id');
+    return c.json(await refundStep(id, 'accept-claim', () => service.contractorAcceptClaim(id)));
+  });
 
   registerWeb(app, { service, log });
 

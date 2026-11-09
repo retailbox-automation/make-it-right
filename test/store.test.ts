@@ -77,6 +77,20 @@ describe.each(kinds)('%s', (_name, make) => {
     expect(await store.caseIdForOrder("O1' or '1'='1")).toBeUndefined();
   });
 
+  it('keeps daily places per key and day, gives one back, and refuses one past the limit', async () => {
+    const store = await make();
+    const a = await store.takeDailyPlace('refund', '2026-11-09', 2, 'adjudicate c1');
+    const b = await store.takeDailyPlace('refund', '2026-11-09', 2, 'accept-claim c2');
+    expect(a).not.toBeNull();
+    expect(b).not.toBeNull();
+    expect(await store.takeDailyPlace('refund', '2026-11-09', 2, 'x')).toBeNull();
+    expect(await store.takeDailyPlace('other', '2026-11-09', 2, 'x')).not.toBeNull();
+    expect(await store.takeDailyPlace('refund', '2026-11-10', 2, 'x')).not.toBeNull();
+    await store.releaseDailyPlace(a!);
+    expect(await store.takeDailyPlace('refund', '2026-11-09', 2, 'x')).not.toBeNull();
+    expect(await store.takeDailyPlace('refund', '2026-11-09', 2, 'x')).toBeNull();
+  });
+
   it('hands out copies: changing one does not change the store', async () => {
     const store = await make();
     await store.put(record('one'));

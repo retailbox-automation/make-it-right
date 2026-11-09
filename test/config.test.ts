@@ -103,13 +103,19 @@ describe('loadConfig', () => {
     const host = { ...creds, MIR_PUBLIC_DEMO: '1', MIR_RETURN_URL: 'https://mir.example/paypal/return', MIR_CANCEL_URL: 'https://mir.example/paypal/cancel', MIR_POLL_SECONDS: '60' };
 
     it('caps new demo cases at 25 per address and 60 in all per day unless told otherwise', () => {
-      expect(loadConfig(host).publicDemo).toEqual({ perAddressPerDay: 25, perDay: 60 });
-      expect(loadConfig({ ...host, MIR_PUBLIC_DEMO: 'true', MIR_DEMO_CASES_PER_ADDRESS_PER_DAY: '3', MIR_DEMO_CASES_PER_DAY: '9' }).publicDemo).toEqual({ perAddressPerDay: 3, perDay: 9 });
+      expect(loadConfig(host).publicDemo).toEqual({ perAddressPerDay: 25, perDay: 60, actionsPerAddress: 30, actionsWindowMinutes: 10, refundsPerDay: 5 });
+      expect(
+        loadConfig({
+          ...host, MIR_PUBLIC_DEMO: 'true', MIR_DEMO_CASES_PER_ADDRESS_PER_DAY: '3', MIR_DEMO_CASES_PER_DAY: '9',
+          MIR_DEMO_ACTIONS_PER_ADDRESS: '12', MIR_DEMO_ACTIONS_WINDOW_MINUTES: '5', MIR_DEMO_REFUNDS_PER_DAY: '2',
+        }).publicDemo,
+      ).toEqual({ perAddressPerDay: 3, perDay: 9, actionsPerAddress: 12, actionsWindowMinutes: 5, refundsPerDay: 2 });
     });
 
-    it.each(['0', '-1', 'many', '2.5'])('rejects a daily cap of %j', (value) => {
-      expect(() => loadConfig({ ...host, MIR_DEMO_CASES_PER_DAY: value })).toThrow(/MIR_DEMO_CASES_PER_DAY must be a whole number/);
-      expect(() => loadConfig({ ...host, MIR_DEMO_CASES_PER_ADDRESS_PER_DAY: value })).toThrow(/MIR_DEMO_CASES_PER_ADDRESS_PER_DAY must be a whole number/);
+    it.each(['0', '-1', 'many', '2.5'])('rejects a daily cap or limit of %j', (value) => {
+      for (const name of ['MIR_DEMO_CASES_PER_DAY', 'MIR_DEMO_CASES_PER_ADDRESS_PER_DAY', 'MIR_DEMO_ACTIONS_PER_ADDRESS', 'MIR_DEMO_ACTIONS_WINDOW_MINUTES', 'MIR_DEMO_REFUNDS_PER_DAY']) {
+        expect(() => loadConfig({ ...host, [name]: value }), name).toThrow(new RegExp(`${name} must be a whole number`));
+      }
     });
 
     it('refuses to start the public demo without the return addresses or the claim poller', () => {

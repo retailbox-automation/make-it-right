@@ -25,6 +25,11 @@ export interface PublicDemoConfig {
   perAddressPerDay: number;
   /** New demo cases all clients together may start per day (UTC) */
   perDay: number;
+  /** Steps that call PayPal (payment, capture, claim look-ups, offer, escalation, decision) one address may take per window */
+  actionsPerAddress: number;
+  actionsWindowMinutes: number;
+  /** Refunds the app itself sets off (PayPal decides, the stand-in accepts the claim) per day (UTC), all clients together */
+  refundsPerDay: number;
 }
 
 export interface VisionConfig {
@@ -46,6 +51,10 @@ const DEFAULT_NUM_CTX = 16384;
 /** A panel of judges often shares one address, so the per-address cap is generous */
 const DEFAULT_DEMO_PER_ADDRESS = 25;
 const DEFAULT_DEMO_PER_DAY = 60;
+const DEFAULT_DEMO_ACTIONS = 30;
+const DEFAULT_DEMO_ACTIONS_WINDOW_MINUTES = 10;
+/** The shared sandbox contractor's balance pays every refund; a few per day keep it from running dry */
+const DEFAULT_DEMO_REFUNDS = 5;
 
 /** MIR_VISION_MODEL=ollama:<model name> (with MIR_OLLAMA_URL and MIR_NUM_CTX); unset or empty = no photo check */
 function loadVision(env: Env): VisionConfig | null {
@@ -107,6 +116,9 @@ function loadPublicDemo(env: Env, pollSeconds: number | null): PublicDemoConfig 
   return {
     perAddressPerDay: wholeAtLeastOne(env, 'MIR_DEMO_CASES_PER_ADDRESS_PER_DAY', DEFAULT_DEMO_PER_ADDRESS),
     perDay: wholeAtLeastOne(env, 'MIR_DEMO_CASES_PER_DAY', DEFAULT_DEMO_PER_DAY),
+    actionsPerAddress: wholeAtLeastOne(env, 'MIR_DEMO_ACTIONS_PER_ADDRESS', DEFAULT_DEMO_ACTIONS),
+    actionsWindowMinutes: wholeAtLeastOne(env, 'MIR_DEMO_ACTIONS_WINDOW_MINUTES', DEFAULT_DEMO_ACTIONS_WINDOW_MINUTES),
+    refundsPerDay: wholeAtLeastOne(env, 'MIR_DEMO_REFUNDS_PER_DAY', DEFAULT_DEMO_REFUNDS),
   };
 }
 

@@ -2,7 +2,7 @@
 
 **Paid the contractor $3,700. The job is half done. Claim: $2,650. You file it yourself on PayPal.**
 
-Make It Right is for the job you already paid for. It reads the estimate, the text messages and the job-site photos, sorts every promised item on the punch list into done, partly done or not done, with a photo for each, and prepares a PayPal claim for exactly the unfinished work. You file the claim yourself on PayPal; the app finds it, then follows the contractor's offer, the escalation and the refund, and explains each step. It never moves money on its own.
+Make It Right is for the job you already paid for. It reads the estimate, the text messages and the job-site photos, sorts every promised item on the punch list into done, partly done or not done, with a photo for each, and prepares a PayPal claim for exactly the unfinished work. You file the claim yourself on PayPal; the app finds it, then follows the contractor's offer, the escalation and the refund, and explains each step. It never files a claim or accepts an offer for you; in the sandbox demo, buttons marked "Sandbox stand-in" or "Sandbox only" play the contractor and PayPal.
 
 PayPal **sandbox only**: no real money moves.
 
@@ -13,7 +13,10 @@ Demo: **https://makeitright.retailbox-automation.com** (no login).
 1. **Open the walkthrough** to see the demo case: what Ridgeway Electric (a made-up contractor) promised, what each photo shows, and the claim the app computes. Read-only.
 2. **Start with your PayPal sandbox account** makes your own copy of the demo case. Log in with your own PayPal sandbox Personal account and approve the $3,700.00 payment (sandbox money).
 3. Back in the app, press **File with PayPal** and file "Service not received" in the sandbox Resolution Center for the amounts the claim screen shows ($2,650.00 in total).
-4. The app finds your claim within a few minutes (3 to 4 in our sandbox runs); you can also press **Check PayPal now** on the claim screen. On the offer screen, **Sandbox stand-in: contractor makes an offer**, then accept it on PayPal or press **Ask PayPal to decide** (the hosted demo allows 5 such sandbox refunds a day, because the sandbox seller is shared). The money-back screen shows the outcome.
+4. The app finds your claim within a few minutes (3 to 4 in our sandbox runs); you can also press **Check PayPal now** on the claim screen. On the offer screen, **Sandbox stand-in: contractor makes an offer** (PayPal opens this a few minutes after you file).
+5. Accept the offer on PayPal, or press **Ask PayPal to decide**: that escalates the case, and the next buttons, **Sandbox stand-in: contractor answers PayPal** (when shown) and **Sandbox only: PayPal decides, in your favor**, finish it once PayPal opens the step. The money-back screen shows the outcome.
+
+The full path takes about 20 minutes, mostly PayPal's own delays. The sandbox seller is shared, so the hosted demo allows 5 refund steps a day for all judges together (the stand-in's offer, the stand-in accepting a claim, and PayPal's decision each use one). To see a case that went all the way without running anything: [/cases/de35db1b41bc/money-back](https://makeitright.retailbox-automation.com/cases/de35db1b41bc/money-back) (9 Nov 2026, claim `PP-R-DVT-10197552`).
 
 No credentials of ours are needed. The photo check on the hosted demo replays a recorded analysis (see below); every PayPal call is live, in the sandbox.
 
@@ -41,7 +44,7 @@ No credentials of ours are needed. The photo check on the hosted demo replays a 
 
 - **Orders v2:** the payment is created with the promised items as order items and a `custom_id` starting with `MIR-`, then captured after the homeowner approves it.
 - **Disputes API:** a tracker lists claims every minute and matches them to our payments, reads the homeowner's own transaction id from the claim, and maps PayPal's answers to offer, escalation and outcome. A contractor stand-in makes an offer (`make-offer`) or accepts the claim (`accept-claim`); escalation (`escalate`); and, in the sandbox only, PayPal's decision (`adjudicate`).
-- **The homeowner files the claim on PayPal's site.** PayPal has no API for a buyer to open a claim (our call on the homeowner's behalf answered 400), so the app prepares the amount and the proof per item and the homeowner files it.
+- **The homeowner files the claim on PayPal's site.** PayPal has no API for a buyer to open a claim (our call on the homeowner's behalf answered 400), so the app prepares the amount for each item, with the photo that proves it on the claim screen, and the homeowner files it. Files attached to a claim by our test script did not reach PayPal (`docs/sandbox-evidence.md`, limit 4).
 - Guards: sandbox base URL only; no webhook calls (the PayPal app is shared, so the app polls); POST and PATCH only on orders and claims recorded on our own cases. Details: `docs/paypal-notes.md`.
 
 ## Run it yourself
@@ -55,7 +58,7 @@ PAYPAL_SANDBOX_CLIENT_ID=... PAYPAL_SANDBOX_CLIENT_SECRET=... MIR_POLL_SECONDS=6
 # live photo check (optional): MIR_VISION_MODEL=ollama:gemma4:31b (MIR_OLLAMA_URL, MIR_NUM_CTX)
 ```
 
-Put the two sandbox credentials in the environment from your own secret store, not on the command line. Other settings: `PORT`, `MIR_DATA_DIR`, `MIR_RETURN_URL`, `MIR_CANCEL_URL`, `MIR_CALL_JOURNAL` (see `src/config.ts`). `MIR_PUBLIC_DEMO=1` turns on the hosted demo's limits, because the sandbox seller and the PayPal app are shared: cases only from the demo template; daily caps on new live cases (`MIR_DEMO_CASES_PER_ADDRESS_PER_DAY`, default 25, `MIR_DEMO_CASES_PER_DAY`, default 60); a limit on steps that call PayPal (`MIR_DEMO_ACTIONS_PER_ADDRESS` per `MIR_DEMO_ACTIONS_WINDOW_MINUTES`, default 30 per 10 minutes); and at most `MIR_DEMO_REFUNDS_PER_DAY` (default 5) refunds a day that the app itself triggers (PayPal deciding in the sandbox, or the stand-in accepting a claim).
+Put the two sandbox credentials in the environment from your own secret store, not on the command line. Other settings: `PORT`, `MIR_DATA_DIR`, `MIR_RETURN_URL`, `MIR_CANCEL_URL`, `MIR_CALL_JOURNAL` (see `src/config.ts`). `MIR_PUBLIC_DEMO=1` turns on the hosted demo's limits, because the sandbox seller and the PayPal app are shared: cases only from the demo template; daily caps on new live cases (`MIR_DEMO_CASES_PER_ADDRESS_PER_DAY`, default 25, `MIR_DEMO_CASES_PER_DAY`, default 60); a limit on steps that call PayPal (`MIR_DEMO_ACTIONS_PER_ADDRESS` per `MIR_DEMO_ACTIONS_WINDOW_MINUTES`, default 30 per 10 minutes); and at most `MIR_DEMO_REFUNDS_PER_DAY` (default 5) refund steps a day that the app itself triggers (the stand-in's offer, the stand-in accepting a claim, or PayPal deciding in the sandbox).
 
 The hosted demo runs from the `Dockerfile`: `tools/docker-entrypoint.sh` reads the service's secrets from a vault at start (`infisical run`), refuses to start without them, and runs the app as an unprivileged user.
 

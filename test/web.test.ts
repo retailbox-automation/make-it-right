@@ -201,7 +201,7 @@ describe('the HTML of the screens', () => {
 
   it('no demo value is written into the app\'s pages', () => {
     const own = pages('web');
-    expect(own.map((f) => f.slice(f.lastIndexOf('/') + 1)).sort()).toEqual(['claim.html', 'index.html', 'money-back.html', 'offer.html', 'promised.html']);
+    expect(own.map((f) => f.slice(f.lastIndexOf('/') + 1)).sort()).toEqual(['claim.html', 'hostile.html', 'index.html', 'money-back.html', 'offer.html', 'promised.html']);
     for (const file of own) expect(found(file), file).toEqual([]);
   });
 

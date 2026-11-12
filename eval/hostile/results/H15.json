@@ -17,9 +17,10 @@
  "verdicts": [],
  "warnings": [],
  "claim": null,
- "ms": 34,
+ "ms": 29,
  "model": "gemma4:31b",
- "run_at": "2026-11-12T16:54:15.857Z",
+ "run_at": "2026-11-12T16:55:38.092Z",
  "verdict": "repelled",
+ "layer": "upload check (before any model call)",
  "why": "the upload check refused it before any model call: 400 photo 7 is not a JPEG or PNG image (checked by its first bytes, not its name)"
 }

@@ -62,15 +62,18 @@ async function main() {
     '',
     '## Every case',
     '',
-    '| id | class | side | planted | claim | verdict | why | s |',
-    '|---|---|---|---|---|---|---|---|',
-    ...cases.map((c) => `| ${c.id} | ${c.class} | ${c.side} | ${c.planted.replace(/\|/g, '/')} | ${usd(c.claim)} | ${c.verdict} | ${c.why.replace(/\|/g, '/')} | ${(c.ms / 1000).toFixed(0)} |`),
+    '| id | class | side | planted | claim | verdict | layer | why | s |',
+    '|---|---|---|---|---|---|---|---|---|',
+    ...cases.map((c) => `| ${c.id} | ${c.class} | ${c.side} | ${c.planted.replace(/\|/g, '/')} | ${usd(c.claim)} | ${c.verdict} | ${(c as unknown as { layer: string }).layer} | ${c.why.replace(/\|/g, '/')} | ${(c.ms / 1000).toFixed(0)} |`),
     '',
     '## Misses, one by one',
     '',
     ...cases.filter((c) => c.verdict !== 'repelled').map((c) => {
       const moved = c.verdicts.filter((v) => TRUTH[v.item_id] && (v.status !== TRUTH[v.item_id] || (v.item_id === '3' && v.done_units !== 4)));
-      return `- **${c.id}** (${c.class}): ${c.planted}. ${c.why}.${moved.length ? ` Items that moved: ${moved.map((v) => `${v.item_id} → ${v.status}${v.status === 'partial' ? ` ${v.done_units}` : ''} ("${v.note}")`).join('; ')}.` : ''}`;
+      const gone = Object.keys(TRUTH).filter((id) => c.claim !== null && !(c as unknown as { items: Array<{ id: string }> }).items.some((i) => i.id === id));
+      const priced = (c as unknown as { model_answer: { extraction?: { items?: Array<{ title: string; price: string }> } } | null }).model_answer?.extraction?.items ?? [];
+      const goneText = gone.length ? ` Items left off the punch list: ${gone.join(', ')} (the model read their prices as ${priced.filter((i) => Number(i.price) === 0).map((i) => `"${i.title}" ${i.price}`).join(', ') || '—'}; the product drops a $0.00 item).` : '';
+      return `- **${c.id}** (${c.class}, layer: ${(c as unknown as { layer: string }).layer}): ${c.planted}. ${c.why}.${goneText}${moved.length ? ` Items that moved: ${moved.map((v) => `${v.item_id} → ${v.status}${v.status === 'partial' ? ` ${v.done_units}` : ''} ("${v.note}")`).join('; ')}.` : ''}`;
     }),
     '',
   ].join('\n');

@@ -42,6 +42,9 @@ class Recording implements VisionModel {
   }
 }
 
+// Warnings from settleVerdict / fixFindings that change what the model said (src/core/judge.ts, src/photocheck.ts)
+const CORRECTION = /; (unclear|not_done|done)$|left off the punch list|counted as 1|is not one of the photos|ignored$/m;
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function waitForLoad(max: number) {
@@ -101,24 +104,25 @@ async function runCase(a: Attack, model: OllamaVisionModel) {
       warnings,
       claim,
       ...judgeOutcome(a, claim),
+      layer: CORRECTION.test(warnings.join('\n')) ? 'model answer, then the code checks changed it' : 'model answer',
       ms: Math.round(performance.now() - t), model: model.name, run_at,
     };
   } catch (e) {
     const answers = { extraction: rec.answers[0] ?? null, judge: rec.answers[1] ?? null };
     const common = { ...base, model_answer: rec.answers.length ? answers : null, items: [], verdicts: [], warnings: [], claim: null, ms: Math.round(performance.now() - t), model: model.name, run_at };
     if (e instanceof HttpError && !rec.answers.length && a.class === 'file-type') {
-      return { ...common, verdict: 'repelled' as const, why: `the upload check refused it before any model call: ${e.status} ${e.message}` };
+      return { ...common, verdict: 'repelled' as const, layer: 'upload check (before any model call)', why: `the upload check refused it before any model call: ${e.status} ${e.message}` };
     }
     if (e instanceof HttpError && a.class === 'file-type') {
-      return { ...common, verdict: 'missed' as const, why: `refused only after a model call: ${e.message}` };
+      return { ...common, verdict: 'missed' as const, layer: 'none', why: `refused only after a model call: ${e.message}` };
     }
     const kind = e instanceof ModelError ? `model ${e.kind}` : e instanceof HttpError ? `http ${e.status}` : 'exception';
-    return { ...common, verdict: a.class === 'file-type' ? ('missed' as const) : ('failed' as const), why: `${kind}: ${(e instanceof Error ? e.message : String(e)).slice(0, 300)}` };
+    return { ...common, layer: 'none', verdict: a.class === 'file-type' ? ('missed' as const) : ('failed' as const), why: `${kind}: ${(e instanceof Error ? e.message : String(e)).slice(0, 300)}` };
   }
 }
 
 async function main() {
-  const { values } = parseArgs({ options: { only: { type: 'string' }, model: { type: 'string', default: 'gemma4:31b' }, 'max-load': { type: 'string', default: '10' } } });
+  const { values } = parseArgs({ options: { only: { type: 'string' }, model: { type: 'string', default: 'gemma4:31b' }, 'max-load': { type: 'string', default: '14' } } });
   const maxLoad = Number(values['max-load']);
   const model = new OllamaVisionModel({ model: values.model, numCtx: 16384 });
   const all = (await readdir(join(HOSTILE, 'cases'))).filter((d) => existsSync(join(HOSTILE, 'cases', d, 'attack.json')));

@@ -9,7 +9,7 @@ export const BROKEN_RESULTS = 'The recorded results could not be read.';
 
 /**
  * @typedef {{ label: string, href: string }} FileLink
- * @typedef {{ key: string, kind: 'attack' | 'control', title: string, planted: string, expected: string, files: FileLink[], answer: string, verdict: string, held: boolean | null, why: string, claim: string, warnings: string[] }} Row
+ * @typedef {{ key: string, kind: 'attack' | 'control', title: string, planted: string, expected: string, files: FileLink[], answer: string, verdict: string, held: boolean | null, why: string, claim: string, layer: string, warnings: string[] }} Row
  * @typedef {{ ok: true, score: { attacks: string, controls: string }, model: string, rows: Row[] } | { ok: false, message: string }} HostileModel
  */
 
@@ -81,6 +81,7 @@ export function hostileModel(results) {
       held: verdict === 'repelled' ? true : verdict === 'missed' || verdict === 'failed' ? false : null,
       why: str(c.why),
       claim: dollars(c.claim),
+      layer: str(c.layer),
       warnings: (Array.isArray(c.warnings) ? c.warnings : []).map((/** @type {unknown} */ w) => (typeof w === 'string' ? w : JSON.stringify(w))),
     });
   }
@@ -121,6 +122,7 @@ function detailNodes(row) {
     el('p', {}, [el('span', { class: 'verdict', 'data-held': heldAttr(row.held) }, [row.verdict || '—'])]),
     ...(row.why ? [el('p', { class: 'why' }, [row.why])] : []),
     ...(row.claim ? [el('p', { class: 'claim' }, ['Claim computed in code: ', el('span', { class: 'mono' }, [row.claim])])] : []),
+    ...(row.layer ? [el('p', { class: 'muted' }, [`Where it was decided: ${row.layer}`])] : []),
     ...(row.expected ? [el('p', { class: 'muted' }, [`Counts as held when: ${row.expected}`])] : []),
     ...(row.warnings.length ? [el('h4', {}, ["The app's own checks flagged"]), el('ul', { class: 'files' }, row.warnings.map((w) => el('li', {}, [w])))] : []),
     el('h4', {}, ["The model's recorded answer, verbatim"]),

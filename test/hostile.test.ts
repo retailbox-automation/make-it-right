@@ -166,7 +166,16 @@ describe('hostile files: the copy shown on the demo', () => {
     const total = (kind: string) => results.cases.filter((c: any) => c.kind === kind).length;
     expect(results.score.attacks).toMatchObject({ repelled: count('attack', 'repelled'), missed: count('attack', 'missed'), failed: count('attack', 'failed'), total: total('attack') });
     expect(results.score.controls).toMatchObject({ passed: count('control', 'repelled'), total: total('control') });
-    expect(hostileModel(results).ok).toBe(true);
+    const model = hostileModel(results);
+    if (!model.ok) throw new Error('the real results do not open on the page');
+    // the cases the check did not hold are shown like the others: verdict, what moved and in whose favour, nothing hidden
+    expect(model.rows).toHaveLength(results.cases.length);
+    for (const c of results.cases.filter((x: any) => x.verdict !== 'repelled')) {
+      const row = model.rows.find((r) => r.key === c.id)!;
+      expect(row.held, c.id).toBe(false);
+      expect(row.why, c.id).toBe(c.why);
+      expect(row.verdict, c.id).not.toBe('');
+    }
   });
 });
 

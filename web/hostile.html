@@ -41,6 +41,7 @@ h1 { margin: 0; font-size: 52px; line-height: 1.08; letter-spacing: -0.9px; max-
 .score-label { display: block; margin-top: 8px; font-size: 18px; line-height: 1.4; }
 .note { margin: 14px 0 0; font-size: 16px; line-height: 1.45; color: var(--muted); max-width: 820px; }
 .board { margin-top: 36px; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 24px; align-items: start; }
+.board > .open { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow: auto; }
 .card { border: 1px solid var(--rule); padding: 24px 26px 26px; }
 .card h2 { margin: 0; font-size: 30px; line-height: 1.15; letter-spacing: -0.3px; }
 .cases { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
@@ -72,6 +73,8 @@ h1 { margin: 0; font-size: 52px; line-height: 1.08; letter-spacing: -0.9px; max-
 }
 .pick { margin: 0; font-size: 17px; color: var(--muted); }
 .mono { font-family: var(--font-mono); font-weight: 500; }
+.shot { display: block; margin-top: 10px; max-width: 420px; border: 1px solid var(--rule); background: #EAE4D8; }
+.shot img { display: block; width: 100%; height: auto; }
 .why { margin: 10px 0 0; font-size: 17px; line-height: 1.45; }
 .claim { margin: 8px 0 0; font-size: 17px; line-height: 1.45; }
 footer { padding: 0 40px 32px; font-size: 15px; color: var(--muted); }
@@ -86,6 +89,9 @@ footer a { color: var(--muted); }
   .scores { grid-template-columns: minmax(0, 1fr); gap: 12px; margin-top: 24px; }
   .score-num { font-size: 32px; }
   .board { grid-template-columns: minmax(0, 1fr); gap: 16px; margin-top: 24px; }
+  .board > .open { position: static; max-height: none; overflow: visible; }
+  .case { grid-template-columns: minmax(0, 1fr); }
+  .case-verdict { justify-self: start; }
   .card { padding: 18px 16px 20px; }
   .card h2 { font-size: 24px; }
   .detail h3 { font-size: 23px; }
@@ -119,7 +125,7 @@ footer a { color: var(--muted); }
         <h2 id="cases-h">Cases</h2>
         <ul class="cases" data-cases></ul>
       </section>
-      <section class="card" aria-live="polite">
+      <section class="card open" aria-live="polite">
         <div class="detail" data-detail hidden></div>
         <p class="pick" data-pick>Pick a case on the left to open it.</p>
       </section>

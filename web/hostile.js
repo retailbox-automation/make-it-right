@@ -101,8 +101,15 @@ const heldAttr = (/** @type {boolean | null} */ held) => (held === null ? 'unkno
 
 /** @param {Row} row */
 function detailNodes(row) {
+  const link = (/** @type {FileLink} */ f) => el('a', { href: f.href, target: '_blank', rel: 'noopener noreferrer' }, [f.label]);
+  const images = row.files.filter((f) => /\.(png|jpe?g)$/i.test(f.label)).map((f) => {
+    const img = /** @type {HTMLImageElement} */ (el('img', { src: f.href, alt: `Planted file ${f.label}`, loading: 'lazy' }));
+    // a file named like an image may not be one (a renamed PDF): then only its link stays
+    img.addEventListener('error', () => img.closest('a')?.remove());
+    return el('a', { class: 'shot', href: f.href, target: '_blank', rel: 'noopener noreferrer' }, [img]);
+  });
   const files = row.files.length
-    ? el('ul', { class: 'files' }, row.files.map((f) => el('li', {}, [el('a', { href: f.href, target: '_blank', rel: 'noopener noreferrer' }, [f.label])])))
+    ? el('div', {}, [el('ul', { class: 'files' }, row.files.map((f) => el('li', {}, [link(f)]))), ...images])
     : el('p', { class: 'muted' }, [row.kind === 'control' ? 'The demo job files, as they are.' : 'No planted file for this case.']);
   return [
     el('p', { class: 'kicker' }, [row.kind === 'attack' ? 'Hostile case' : 'Honest control case']),
@@ -157,6 +164,8 @@ function render(model) {
     });
     list.append(el('li', {}, [button]));
   }
+  // on a wide screen the first case is open from the start, so the right side is never empty
+  if (!window.matchMedia('(max-width: 760px)').matches) /** @type {HTMLElement | null} */ (list.querySelector('button'))?.click();
 }
 
 async function boot() {

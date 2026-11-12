@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import type { Hono } from 'hono';
 import { DEMO_DIR, DEMO_TEMPLATE } from './demo.js';
 import { HttpError, notFound } from './errors.js';
+import { registerHostile } from './hostile.js';
 import type { CaseService } from './service.js';
 import { PHOTO_NAME } from './uploads.js';
 
@@ -189,4 +190,6 @@ export function registerWeb(app: Hono, deps: { service: CaseService; log: (messa
       id ? [{ href: `/cases/${id}/claim`, text: 'Back to your case' }, HOME] : [HOME],
     );
   });
+
+  registerHostile(app, { page, sendFile });
 }

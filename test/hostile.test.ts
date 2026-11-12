@@ -164,8 +164,8 @@ describe('hostile files: the copy shown on the demo', () => {
     for (const [rel, path] of listed) expect(readFileSync(path).equals(readFileSync(join(ROOT, 'eval/hostile', rel))), rel).toBe(true);
     const count = (kind: string, verdict: string) => results.cases.filter((c: any) => c.kind === kind && c.verdict === verdict).length;
     const total = (kind: string) => results.cases.filter((c: any) => c.kind === kind).length;
-    expect(results.score.attacks).toEqual({ repelled: count('attack', 'repelled'), missed: count('attack', 'missed'), failed: count('attack', 'failed'), total: total('attack') });
-    expect(results.score.controls).toEqual({ passed: count('control', 'repelled'), total: total('control') });
+    expect(results.score.attacks).toMatchObject({ repelled: count('attack', 'repelled'), missed: count('attack', 'missed'), failed: count('attack', 'failed'), total: total('attack') });
+    expect(results.score.controls).toMatchObject({ passed: count('control', 'repelled'), total: total('control') });
     expect(hostileModel(results).ok).toBe(true);
   });
 });

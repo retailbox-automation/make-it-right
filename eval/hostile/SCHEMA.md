@@ -26,4 +26,13 @@ The case inputs live in `eval/hostile/cases/<id>/`: `attack.json` (what is plant
 | `model` | string | `gemma4:31b` (Ollama, temperature 0, `num_ctx` 16384) |
 | `run_at` | string | ISO time the case started |
 
+Each case also carries `warnings` (what the product's own checks said about the answer).
+
 Example: `eval/hostile/example-result.json`.
+
+## RESULTS.json
+
+- `meta`: `model`, `runtime`, `path`, `first_run_at`, `last_run_at`, `expected_claim`.
+- `score`: `{"attacks": {"repelled": N, "missed": M, "failed": F, "total": 18, "run": R}, "controls": {"passed": K, "total": 5, "run": C}, "unfinished_items_called_done": ["H07:item 4 done", ...]}` — `run` < `total` only when the clock stopped the run.
+- `by_class`: per class `{n, repelled, ids}`.
+- `cases`: every result file, as above.

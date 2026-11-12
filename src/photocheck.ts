@@ -39,7 +39,7 @@ function fit(text: string, max: number, label: string, warnings: string[]): stri
   return cut(text, max);
 }
 
-async function coreInput(intake: Intake): Promise<CoreInput> {
+export async function coreInput(intake: Intake): Promise<CoreInput> {
   let estimate;
   try {
     estimate = await parseEstimate(intake.estimate.bytes);
@@ -61,7 +61,7 @@ async function coreInput(intake: Intake): Promise<CoreInput> {
  * (the price is the total for the item anyway), and text longer than a case takes is shortened. Each change is a warning.
  * Ids stay as they were, so the numbers in the warnings still match; a dropped item leaves a gap.
  */
-function fixFindings(found: Pick<Analysis, 'promised_items' | 'verdicts'>, warnings: string[]): { promised_items: PromisedItem[]; verdicts: Verdict[] } {
+export function fixFindings(found: Pick<Analysis, 'promised_items' | 'verdicts'>, warnings: string[]): { promised_items: PromisedItem[]; verdicts: Verdict[] } {
   const promised_items: PromisedItem[] = [];
   const verdicts: Verdict[] = [];
   for (const item of found.promised_items) {

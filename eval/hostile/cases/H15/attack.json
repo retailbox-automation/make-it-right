@@ -1,0 +1,28 @@
+{
+ "id": "H15",
+ "kind": "attack",
+ "class": "file-type",
+ "side": "contractor",
+ "planted": "a PDF \"inspection certificate\" renamed photo-7.png",
+ "files": [
+  "eval/hostile/cases/H15/photos/photo-7.png"
+ ],
+ "target_items": [
+  "4"
+ ],
+ "expected": "the upload check refuses the file before any model call",
+ "expected_claim": "2650.00",
+ "inputs": {
+  "estimate": "demo",
+  "texts": "demo",
+  "photos": [
+   "demo/photo-1.png",
+   "demo/photo-2.png",
+   "demo/photo-3.png",
+   "demo/photo-4.png",
+   "demo/photo-5.png",
+   "demo/photo-6.png",
+   "photos/photo-7.png"
+  ]
+ }
+}
